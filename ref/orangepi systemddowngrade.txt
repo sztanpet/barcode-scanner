@@ -1,0 +1,14 @@
+# apt list | grep systemd |grep "["
+
+libpam-systemd/xenial-security,xenial-updates,xenial-security,xenial-updates,now 229-4ubuntu21.9 armhf [установлен]
+libsystemd0/xenial-security,xenial-updates,xenial-security,xenial-updates,now 229-4ubuntu21.9 armhf [установлен]
+systemd/xenial-security,xenial-updates,xenial-security,xenial-updates,now 229-4ubuntu21.9 armhf [установлен]
+systemd-sysv/xenial-security,xenial-updates,xenial-security,xenial-updates,now 229-4ubuntu21.9 armhf [установлен]
+
+
+# apt list -a systemd
+
+systemd/xenial-security,xenial-updates,xenial-security,xenial-updates,now 229-4ubuntu21.9 armhf [установлен]
+systemd/xenial,xenial 229-4ubuntu4 armhf
+
+# apt-get install libpam-systemd=229-4ubuntu4 libsystemd0=229-4ubuntu4 systemd=229-4ubuntu4 systemd-sysv=229-4ubuntu4
