@@ -18,6 +18,7 @@ func Setup() error {
 	// echo 241779 > /sys/class/pwm/pwmchip0/pwm0/duty_cycle
 	// echo 483558 > /sys/class/pwm/pwmchip0/pwm0/period
 
+	// already exported?
 	if _, err := os.Stat(pwmBase + port); err == nil {
 		exported = true
 	}

@@ -3,6 +3,7 @@ package display
 import (
 	"fmt"
 	"image"
+	"sync"
 	"time"
 
 	"golang.org/x/image/font"
@@ -14,6 +15,10 @@ import (
 	"periph.io/x/periph/host"
 )
 
+// lineCount defines how many lines of text fit on the screen
+const lineCount = 4
+
+// textFont is the font used for displaying text
 var textFont = inconsolata.Bold8x16
 
 // The ScreenTimeout after which the display is blanked to prevent burn-in.
@@ -23,9 +28,13 @@ type Screen struct {
 	dev        *ssd1306.Dev
 	img        *image1bit.VerticalLSB
 	lastActive time.Time
+
+	mu    sync.Mutex
+	lines []string
 }
 
 func NewScreen() (*Screen, error) {
+	// TODO logging, error cleanup
 	if _, err := host.Init(); err != nil {
 		fmt.Printf("no display detected, skipping: %v", err)
 		return nil, err
@@ -48,17 +57,32 @@ func NewScreen() (*Screen, error) {
 	img := image1bit.NewVerticalLSB(dev.Bounds())
 
 	return &Screen{
-		dev: dev,
-		img: img,
+		dev:   dev,
+		img:   img,
+		lines: make([]string, lineCount),
 	}, nil
+}
+
+func (s *Screen) Lines() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ret := make([]string, 0, lineCount)
+	_ = copy(ret, s.lines)
+
+	return ret
 }
 
 func (s *Screen) WriteLine(linenum int, text string) error {
 	s.MarkActivity()
+	s.mu.Lock()
+	s.lines[linenum] = text
+	s.mu.Unlock()
+
 	height := s.img.Bounds().Dy() - textFont.Descent
-	// "invert" the linenumber
-	// 0-th line should be the top, 3rd line should be at the bottom
-	// by default, thats inverted
+	// by default, 0th line is at the bottom, 3rd is at the top,
+	// invert it, because it feels better
+	// 0th line should be the top, 3rd line should be at the bottom
 	height -= (3 - linenum) * textFont.Height
 	drawer := font.Drawer{
 		Dst:  s.img,

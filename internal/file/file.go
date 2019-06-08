@@ -2,6 +2,7 @@ package file
 
 import (
 	"encoding/gob"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -27,7 +28,11 @@ func Serialize(path string, data interface{}) error {
 		return err
 	}
 
-	tf.Sync()
+	err = tf.Sync()
+	if err != nil {
+		_ = tf.Close()
+		return err
+	}
 	_ = tf.Close()
 
 	err = os.Rename(tf.Name(), path)
@@ -78,4 +83,60 @@ func TmpFile(name string) (*os.File, error) {
 	}
 
 	return f, nil
+}
+
+func WriteAtomically(dest string, r io.Reader) error {
+	tf, err := ioutil.TempFile("", filepath.Base(dest))
+	if err != nil {
+		return err
+	}
+	defer tf.Close()
+
+	_, err = io.Copy(tf, r)
+	if err != nil {
+		return err
+	}
+
+	err = tf.Sync()
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(tf.Name(), dest)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func Exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func CopyOver(src, dest string) error {
+	sf, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sf.Close()
+
+	ss, err := sf.Stat()
+	if err != nil {
+		return err
+	}
+
+	df, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, ss.Mode())
+	if err != nil {
+		return err
+	}
+	defer df.Close()
+
+	_, err = io.Copy(df, sf)
+	if err != nil {
+		return err
+	}
+
+	return df.Sync()
 }
