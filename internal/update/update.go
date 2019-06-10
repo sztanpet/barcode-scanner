@@ -3,14 +3,15 @@ package update
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"time"
 
 	"code.sztanpet.net/barcode-scanner/internal/file"
@@ -19,19 +20,17 @@ import (
 
 const platform = runtime.GOOS + "-" + runtime.GOARCH
 
-var UpdateDurr = 5 * time.Minute
-
 var logger = loggo.GetLogger("main.update")
 var ErrFileInvalid = errors.New("File failed integrity check")
 
 type Binary struct {
-	BaseURL  string
-	StateDir string
-	client   *http.Client
-
-	mu   sync.Mutex
-	hash []byte
+	// the baseURL to contact for updates
+	baseURL string
+	client  *http.Client
+	// the binary path to update, usually os.Executable()
 	path string
+	// the current hash of the binary path
+	hash []byte
 }
 
 // info is the information about the update version
@@ -41,15 +40,16 @@ type info struct {
 	BinaryPath string
 }
 
-func NewBinary(path string) (*Binary, error) {
+func NewBinary(path, baseURL string) (*Binary, error) {
 	h, err := getFileSha(path)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Binary{
-		path: path,
-		hash: h,
+		baseURL: baseURL,
+		path:    path,
+		hash:    h,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -74,53 +74,70 @@ func (b *Binary) signalFile() string {
 	)
 }
 
-// binary path
-// => hash a current hash,
-// ha elter az update serveren levotol akkor update
-// => a pathbol generaljuk az url-t a baseurl-hez merten
-// ha van uj update akkor azt letoltjuk, ellenorizzuk a hasht,
-// es jelezni kell a binarisnak hogy induljon ujra (temp dirbe rakott signal file-al)
-// ujraindulaskor a signal filet el kell tavolitani
-// ugyanezt az update processnek is
-func (b *Binary) UpdateLoop() {
-	t := time.NewTicker(UpdateDurr)
-	for {
-		<-t.C
-		// TODO
-		b.check()
-	}
-}
-
-func (b *Binary) check() {
-	// http request
+func (b *Binary) Check() error {
 	u := b.getURL("version.json")
-
+	logger.Tracef("Checking url: %v", u)
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return
+		return err
 	}
 
 	resp, err := b.client.Do(req)
-	_ = resp
-	// TODO
-	// unmarshal version.json into *info
-	// decide if we need to update
-	// call .download() if so
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		logger.Errorf("Response statuscode for url %v was %v", u, resp.StatusCode)
+		return fmt.Errorf("Non-200 response code (%v)", u)
+	}
+
+	nfo := &info{}
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(nfo)
+	if err != nil {
+		logger.Errorf("Invalid json body in response: %v", err)
+		return err
+	}
+
+	if nfo.Hash == hex.EncodeToString(b.hash) {
+		logger.Tracef("No new update found (%v)", u)
+		return nil
+	}
+
+	return b.download(nfo)
+}
+
+// update.sztanpet.net/barcode-scanner/linux-arm/version.json
+// version.json: {"hash":"abcdef123456789", "binaryPath":"barcode-scanner"}
+// binary-path -> update.sztanpet.net/barcode-scanner/linux-arm/barcode-scanner
+func (b *Binary) getURL(file string) string {
+	v := url.Values{}
+	v.Set("currentSha", hex.EncodeToString(b.hash))
+
+	ret := b.baseURL + "/" + platform + "/" + file
+	ret += "?" + v.Encode()
+	return ret
 }
 
 // download loads the file from the version.json
-func (b *Binary) download(nfo *info) {
-	// http request
+func (b *Binary) download(nfo *info) error {
+	logger.Tracef("downloading update: %#v", nfo)
 	u := b.getURL(nfo.BinaryPath)
 
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return
+		return err
 	}
 
 	resp, err := b.client.Do(req)
-	_ = resp
-	// TODO call .update()
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return b.update(resp.Body, nfo)
 }
 
 // update backs up the main binary, than downloads
@@ -155,18 +172,21 @@ func (b *Binary) update(r io.Reader, nfo *info) error {
 		return err
 	}
 	if nfo.Hash != hex.EncodeToString(fh) {
+		logger.Errorf("corrupted download, hashes do not match: %#v", nfo)
 		return ErrFileInvalid
 	}
 
 	// backup binary
 	err = b.backup()
 	if err != nil {
+		logger.Errorf("backup of %v failed: %v", b.path, err)
 		return err
 	}
 
 	// rename over the binary
 	err = os.Rename(f.Name(), b.path)
 	if err != nil {
+		logger.Errorf("overwriting binary %v failed: %v", b.path, err)
 		return err
 	}
 
@@ -180,15 +200,6 @@ func (b *Binary) backup() error {
 	src := b.path
 	dest := src + ".bkup"
 	return file.CopyOver(src, dest)
-}
-
-func (b *Binary) getURL(file string) string {
-	v := url.Values{}
-	v.Set("currentSha", hex.EncodeToString(b.hash))
-
-	ret := b.BaseURL + "/" + platform + "/" + file
-	ret += "?" + v.Encode()
-	return ret
 }
 
 func getFileSha(path string) ([]byte, error) {
