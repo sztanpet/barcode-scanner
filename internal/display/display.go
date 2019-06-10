@@ -25,12 +25,12 @@ var textFont = inconsolata.Bold8x16
 var ScreenTimeout = 10 * time.Minute
 
 type Screen struct {
-	dev        *ssd1306.Dev
-	img        *image1bit.VerticalLSB
-	lastActive time.Time
+	dev *ssd1306.Dev
+	img *image1bit.VerticalLSB
 
-	mu    sync.Mutex
-	lines []string
+	mu         sync.Mutex
+	lines      []string
+	lastActive time.Time
 }
 
 func NewScreen() (*Screen, error) {
@@ -47,7 +47,7 @@ func NewScreen() (*Screen, error) {
 	}
 
 	opts := ssd1306.DefaultOpts
-	opts.Rotated = false
+	opts.Rotated = false // TODO finalize physical position of screen
 	dev, err := ssd1306.NewI2C(b, &opts)
 	if err != nil {
 		fmt.Printf("could not find ssd1306 screen, display disabled: %v", err)
@@ -106,12 +106,16 @@ func (s *Screen) Blank() error {
 }
 
 func (s *Screen) MarkActivity() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.lastActive = time.Now()
 }
 
 func (s *Screen) shouldBlank() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	blankAfter := s.lastActive.Add(ScreenTimeout)
-	return time.Now().Before(blankAfter)
+	return time.Now().After(blankAfter)
 }
 
 func (s *Screen) HandleScreenSaver() {
