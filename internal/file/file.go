@@ -16,7 +16,7 @@ func init() {
 }
 */
 func Serialize(path string, data interface{}) error {
-	tf, err := ioutil.TempFile("", filepath.Base(path))
+	tf, err := ioutil.TempFile(filepath.Dir(path), filepath.Base(path))
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,9 @@ func TmpFile(name string) (*os.File, error) {
 }
 
 func WriteAtomically(dest string, r io.Reader) error {
-	tf, err := ioutil.TempFile("", filepath.Base(dest))
+	// cross-filesystem renames can't work, so create temp file in the same dir
+	// as the destination
+	tf, err := ioutil.TempFile(filepath.Dir(dest), filepath.Base(dest))
 	if err != nil {
 		return err
 	}
@@ -122,21 +124,5 @@ func CopyOver(src, dest string) error {
 	}
 	defer sf.Close()
 
-	ss, err := sf.Stat()
-	if err != nil {
-		return err
-	}
-
-	df, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, ss.Mode())
-	if err != nil {
-		return err
-	}
-	defer df.Close()
-
-	_, err = io.Copy(df, sf)
-	if err != nil {
-		return err
-	}
-
-	return df.Sync()
+	return WriteAtomically(dest, sf)
 }
