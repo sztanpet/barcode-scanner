@@ -184,7 +184,11 @@ func (b *Binary) update(r io.Reader, nfo *info) error {
 	}
 
 	// rename over the binary
-	err = os.Rename(f.Name(), b.path)
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+	err = file.WriteAtomically(b.path, f)
 	if err != nil {
 		logger.Errorf("overwriting binary %v failed: %v", b.path, err)
 		return err
