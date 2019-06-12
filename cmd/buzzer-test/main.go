@@ -19,7 +19,12 @@ func main() {
 		fmt.Printf("err: %v\n", err)
 	}
 	for {
-		err = buzzer.Beep()
+		err = buzzer.SuccessBeep()
+		if err != nil {
+			fmt.Printf("beep err: %v", err)
+		}
+		<-time.After(1500 * time.Millisecond)
+		err = buzzer.FailBeep()
 		if err != nil {
 			fmt.Printf("beep err: %v", err)
 		}
