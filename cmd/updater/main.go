@@ -16,6 +16,7 @@ var updateDurr = 5 * time.Minute
 const baseURL = "https://update.sztanpet.net"
 
 func main() {
+	// TODO handle signals
 	// basic assumption:
 	// both binaries have to be in the same directory
 	updpath, err := os.Executable()
