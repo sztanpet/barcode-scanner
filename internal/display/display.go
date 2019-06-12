@@ -18,8 +18,8 @@ import (
 // lineCount defines how many lines of text fit on the screen
 const lineCount = 4
 
-// textFont is the font used for displaying text
-var textFont = inconsolata.Bold8x16
+// mediumFont is the font used for displaying text
+var mediumFont = inconsolata.Bold8x16
 
 // The ScreenTimeout after which the display is blanked to prevent burn-in.
 var ScreenTimeout = 10 * time.Minute
@@ -54,6 +54,8 @@ func NewScreen() (*Screen, error) {
 		return nil, err
 	}
 
+	_ = dev.SetContrast(0x0f)
+
 	img := image1bit.NewVerticalLSB(dev.Bounds())
 
 	return &Screen{
@@ -79,15 +81,15 @@ func (s *Screen) WriteLine(linenum int, text string) error {
 	s.lines[linenum] = text
 	s.mu.Unlock()
 
-	height := s.img.Bounds().Dy() - textFont.Descent
+	height := s.img.Bounds().Dy() - mediumFont.Descent
 	// by default, 0th line is at the bottom, 3rd is at the top,
 	// invert it, because it feels better
 	// 0th line should be the top, 3rd line should be at the bottom
-	height -= (3 - linenum) * textFont.Height
+	height -= (3 - linenum) * mediumFont.Height
 	drawer := font.Drawer{
 		Dst:  s.img,
 		Src:  &image.Uniform{image1bit.On},
-		Face: textFont,
+		Face: mediumFont,
 		Dot:  fixed.P(0, height),
 	}
 
@@ -101,8 +103,7 @@ func (s *Screen) Draw() error {
 
 func (s *Screen) Blank() error {
 	s.MarkActivity()
-	img := image1bit.NewVerticalLSB(s.dev.Bounds())
-	return s.dev.Draw(s.dev.Bounds(), img, image.Point{})
+	return s.dev.Halt()
 }
 
 func (s *Screen) MarkActivity() {
