@@ -31,12 +31,17 @@ func Setup() error {
 		exported = true
 	}
 
-	err := write(pwmBase+port+"/duty_cycle", "241779")
+	err := write(pwmBase+port+"/period", "483558")
 	if err != nil {
 		return err
 	}
 
-	err = write(pwmBase+port+"/period", "483558")
+	err = write(pwmBase+port+"/duty_cycle", "241779")
+	if err != nil {
+		return err
+	}
+
+	err = write(pwmBase+port+"/polarity", "normal")
 	if err != nil {
 		return err
 	}
@@ -44,7 +49,9 @@ func Setup() error {
 	return nil
 }
 
-func Beep() (err error) {
+func SuccessBeep() (err error) {
+	defer disable()
+
 	err = write(pwmBase+port+"/enable", "1")
 	if err != nil {
 		return err
@@ -53,6 +60,24 @@ func Beep() (err error) {
 	<-time.After(beepDurr)
 
 	err = write(pwmBase+port+"/enable", "0")
+	return
+}
+
+func FailBeep() (err error) {
+	defer disable()
+
+	for i := 0; i < 4; i++ {
+		err = write(pwmBase+port+"/enable", "1")
+		if err != nil {
+			return err
+		}
+
+		<-time.After(beepDurr / 2)
+
+		err = write(pwmBase+port+"/enable", "0")
+
+		<-time.After(beepDurr / 2)
+	}
 	return
 }
 
@@ -73,4 +98,8 @@ func write(path, value string) error {
 	}
 
 	return nil
+}
+
+func disable() {
+	_ = write(pwmBase+port+"/enable", "0")
 }
