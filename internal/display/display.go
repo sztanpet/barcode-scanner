@@ -1,11 +1,12 @@
 package display
 
 import (
-	"fmt"
+	"context"
 	"image"
 	"sync"
 	"time"
 
+	"github.com/juju/loggo"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/inconsolata"
 	"golang.org/x/image/math/fixed"
@@ -18,13 +19,16 @@ import (
 // lineCount defines how many lines of text fit on the screen
 const lineCount = 4
 
-// mediumFont is the font used for displaying text
+// mediumFont is the font used for displaying default text
 var mediumFont = inconsolata.Bold8x16
 
 // The ScreenTimeout after which the display is blanked to prevent burn-in.
 var ScreenTimeout = 10 * time.Minute
 
+var logger = loggo.GetLogger("main.display")
+
 type Screen struct {
+	ctx context.Context
 	dev *ssd1306.Dev
 	img *image1bit.VerticalLSB
 
@@ -33,16 +37,15 @@ type Screen struct {
 	lastActive time.Time
 }
 
-func NewScreen() (*Screen, error) {
-	// TODO logging, error cleanup
+func NewScreen(ctx context.Context) (*Screen, error) {
 	if _, err := host.Init(); err != nil {
-		fmt.Printf("no display detected, skipping: %v", err)
+		logger.Criticalf("no display detected, skipping: %v", err)
 		return nil, err
 	}
 
 	b, err := i2creg.Open("")
 	if err != nil {
-		fmt.Printf("could not open i2c bus, display disabled: %v", err)
+		logger.Criticalf("could not open i2c bus, display disabled: %v", err)
 		return nil, err
 	}
 
@@ -50,7 +53,7 @@ func NewScreen() (*Screen, error) {
 	opts.Rotated = false // TODO finalize physical position of screen
 	dev, err := ssd1306.NewI2C(b, &opts)
 	if err != nil {
-		fmt.Printf("could not find ssd1306 screen, display disabled: %v", err)
+		logger.Criticalf("could not find ssd1306 screen, display disabled: %v", err)
 		return nil, err
 	}
 
@@ -59,6 +62,7 @@ func NewScreen() (*Screen, error) {
 	img := image1bit.NewVerticalLSB(dev.Bounds())
 
 	return &Screen{
+		ctx:   ctx,
 		dev:   dev,
 		img:   img,
 		lines: make([]string, lineCount),
@@ -122,11 +126,15 @@ func (s *Screen) shouldBlank() bool {
 func (s *Screen) HandleScreenSaver() {
 	t := time.NewTicker(1 * time.Minute)
 	for {
-		<-t.C
-		if s.shouldBlank() {
-			_ = s.Blank()
-		} else {
-			_ = s.Draw()
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-t.C:
+			if s.shouldBlank() {
+				_ = s.Blank()
+			} else {
+				_ = s.Draw()
+			}
 		}
 	}
 }
