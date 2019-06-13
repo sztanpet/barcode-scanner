@@ -218,19 +218,21 @@ func (s *Storage) dbInsert(row Barcode) error {
 		row.CreatedAt.UnixNano(),
 	)
 
-	//  ignore unique error
 	if err != nil {
 		me, ok := err.(*mysql.MySQLError)
 		if !ok {
 			return err
 		}
 
+		//  ignore unique error
 		// uniqe error codes from:
 		// https://dev.mysql.com/doc/refman/5.7/en/server-error-reference.html
 		switch me.Number {
 		case 1062, 1586:
 			return nil
 		}
+
+		return err
 	}
 
 	return nil
