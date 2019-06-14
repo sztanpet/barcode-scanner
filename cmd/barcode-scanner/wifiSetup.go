@@ -3,7 +3,7 @@ package main
 import (
 	"unicode"
 
-	"code.sztanpet.net/barcode-scanner/internal/input"
+	"code.sztanpet.net/barcode-scanner/internal/tty"
 	"code.sztanpet.net/barcode-scanner/internal/wifi"
 )
 
@@ -38,8 +38,9 @@ func (a *app) handleWifiSetupInput(r rune) {
 			}
 			a.doneWifiSetup()
 		}
-	case input.KeyBackspace, input.KeyDelete:
+	case tty.KeyBackspace, tty.KeyDelete:
 		if a.currentLine.Len() >= 1 {
+			// https://stackoverflow.com/questions/39907667/how-to-remove-unicode-characters-from-byte-buffer-in-go
 			a.currentLine.Truncate(a.currentLine.Len() - 1)
 			// TODO display line again
 			logger.Tracef("handleWifiSetupInput: backspace")

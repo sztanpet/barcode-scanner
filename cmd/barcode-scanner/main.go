@@ -3,11 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"os"
+	"os/signal"
 
 	"code.sztanpet.net/barcode-scanner/internal/buzzer"
 	"code.sztanpet.net/barcode-scanner/internal/display"
-	"code.sztanpet.net/barcode-scanner/internal/input"
 	"code.sztanpet.net/barcode-scanner/internal/storage"
+	"code.sztanpet.net/barcode-scanner/internal/tty"
 	"github.com/juju/loggo"
 )
 
@@ -21,6 +24,16 @@ type app struct {
 	storage *storage.Storage
 }
 
+func (a *app) handleSignals() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c)
+	go func(c chan os.Signal) {
+		s := <-c
+		// TODO exit unconditionally on any signal?
+		fmt.Println("Got signal:", s)
+	}(c)
+}
+
 var logger = loggo.GetLogger("main")
 
 func main() {
@@ -29,13 +42,14 @@ func main() {
 		ctx:  ctx,
 		exit: exit,
 	}
+	a.handleSignals()
 	_ = a
 
 	_ = buzzer.Setup()
 	_ = buzzer.SuccessBeep()
-	in, _ := input.New(ctx)
+	in, _ := tty.Open(ctx)
 	for {
-		r, _ := in.ReadRune()
+		r, _, _ := in.ReadRune()
 		a.transitionState(r)
 	}
 }

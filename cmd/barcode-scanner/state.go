@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"code.sztanpet.net/barcode-scanner/internal/input"
+	"code.sztanpet.net/barcode-scanner/internal/tty"
 )
 
 type State int
@@ -20,7 +20,7 @@ func (a *app) transitionState(r rune) {
 
 	switch a.state {
 	case wifiSetupSSID, wifiSetupPW:
-		if r == input.KeyEscape {
+		if r == tty.KeyEscape {
 			logger.Debugf("State: wifiSetup (%v) -> readBarcode (escape pressed)", a.state)
 			a.cancelWifiSetup()
 			return
@@ -30,7 +30,7 @@ func (a *app) transitionState(r rune) {
 		return
 	case readBarcode:
 		switch r {
-		case input.KeyEscape:
+		case tty.KeyEscape:
 			logger.Debugf("State: readBarcode -> wifiSetup (escape pressed)")
 			a.enterWifiSetup()
 			return

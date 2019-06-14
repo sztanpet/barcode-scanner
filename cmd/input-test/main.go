@@ -4,24 +4,35 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
 
-	"code.sztanpet.net/barcode-scanner/internal/input"
+	"code.sztanpet.net/barcode-scanner/internal/tty"
 )
 
 func main() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c)
+	go func(c chan os.Signal) {
+		s := <-c
+		fmt.Println("Got signal:", s)
+	}(c)
+
 	ctx, cancel := context.WithCancel(context.Background())
-	i, err := input.New(ctx)
+	t, err := tty.Open(ctx)
 	if err != nil {
 		log.Fatalf("input err: %v", err)
 	}
+	defer t.RestoreTermMode()
 
 	for {
-		r, err := i.ReadRune()
+		r, _, err := t.ReadRune()
 		if err != nil {
-			log.Fatalf("readrune error: %v", err)
+			log.Printf("readrune %q 0x%x error: %v", r, r, err)
+			continue
 		}
 
-		fmt.Printf("read: %q %x\n", r, r)
+		fmt.Printf("read: %q 0x%x\n", r, r)
 		if r == 4 {
 			fmt.Printf("caught ctrl+d, exiting\n")
 			cancel()
