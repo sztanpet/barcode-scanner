@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"code.sztanpet.net/barcode-scanner/internal/buzzer"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/buzzer"
 )
 
 func main() {

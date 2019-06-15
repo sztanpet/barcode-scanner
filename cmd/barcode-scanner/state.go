@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"code.sztanpet.net/barcode-scanner/internal/tty"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/tty"
 )
 
 type State int

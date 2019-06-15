@@ -7,10 +7,10 @@ import (
 	"os"
 	"os/signal"
 
-	"code.sztanpet.net/barcode-scanner/internal/buzzer"
-	"code.sztanpet.net/barcode-scanner/internal/display"
-	"code.sztanpet.net/barcode-scanner/internal/storage"
-	"code.sztanpet.net/barcode-scanner/internal/tty"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/buzzer"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/display"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/storage"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/tty"
 	"github.com/juju/loggo"
 )
 

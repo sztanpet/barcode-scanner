@@ -9,11 +9,13 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"os"
 	"syscall"
 	"unsafe"
 )
+
+var ErrUnknownEscapeSequence = errors.New("ErrUnknownEscapeSequence")
 
 type TTY struct {
 	ctx    context.Context
@@ -75,7 +77,7 @@ func (t *TTY) ReadRune() (r rune, size int, err error) {
 	for {
 		select {
 		case <-t.ctx.Done():
-			return '\r', 1, nil
+			return '\n', 1, nil
 		default:
 		}
 
@@ -97,8 +99,9 @@ func (t *TTY) ReadRune() (r rune, size int, err error) {
 				return r, size, err
 			}
 
+			// no support for alt+ combinations
 			if r != '[' {
-				return r, size, fmt.Errorf("Unexpected escape sequence: %q", r)
+				return r, size, ErrUnknownEscapeSequence
 			}
 
 			r, size, err = t.reader.ReadRune()
@@ -115,16 +118,16 @@ func (t *TTY) ReadRune() (r rune, size int, err error) {
 				return KeyArrowUp, 1, nil
 			case 'B':
 				return KeyArrowDown, 1, nil
-			case 'H': // Home button
-				return SpecialKeyHome, 1, nil
-			case 'F': // End button
-				return SpecialKeyEnd, 1, nil
 			case '3': // Delete Button
 				// discard the following '~' key from buffer
 				_, _, _ = t.reader.ReadRune()
 				return SpecialKeyDelete, 1, nil
 			default:
-				r = ignoreKey
+				if t.Buffered() {
+					// still a '~' in the buffer, discard
+					_, _, _ = t.reader.ReadRune()
+				}
+				return r, size, ErrUnknownEscapeSequence
 			}
 		}
 

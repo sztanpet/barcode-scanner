@@ -1,70 +1,77 @@
 package main
 
 import (
+	"context"
 	"os"
-	"path/filepath"
+	"strconv"
 	"time"
 
-	"code.sztanpet.net/barcode-scanner/internal/file"
-	"code.sztanpet.net/barcode-scanner/internal/update"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/logwriter"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/telegram"
 	"github.com/juju/loggo"
 )
 
-var logger = loggo.GetLogger("main.updater")
+var logger = loggo.GetLogger("updater")
 var updateDurr = 5 * time.Minute
 
-const baseURL = "https://update.sztanpet.net"
-
 func main() {
-	// TODO handle signals
-	// basic assumption:
-	// both binaries have to be in the same directory
-	updpath, err := os.Executable()
+	baseURL, token, channelID := getEnvVars()
+	ctx, exit := context.WithCancel(context.Background())
+
+	bot, err := telegram.New(ctx, token, channelID)
 	if err != nil {
-		logger.Criticalf("os.Executable err: %v", err)
+		logger.Criticalf("Failed initializing telegram bot: %v", err)
 		os.Exit(1)
 	}
-
-	baseDir := filepath.Dir(updpath)
-	bspath := baseDir + "barcode-scanner"
-	if !file.Exists(bspath) {
-		logger.Criticalf("could not find barcode-scanner in the same dir as the updater: %v", err)
-		os.Exit(1)
-	}
-
-	uu, err := update.NewBinary(updpath, baseURL+"/updater")
+	err = logwriter.Setup(bot)
 	if err != nil {
-		logger.Criticalf("Could not create update updater: %v", err)
+		logger.Criticalf("Failed initializing telegram bot: %v", err)
 		os.Exit(1)
 	}
-	uu.Cleanup()
 
-	ubs, err := update.NewBinary(bspath, baseURL+"/barcode-scanner")
+	a := &app{
+		ctx:     ctx,
+		exit:    exit,
+		baseURL: baseURL,
+	}
+	a.handleSignals()
+	err = a.setupUpdate()
 	if err != nil {
-		logger.Criticalf("Could not create barcode-scanner updater: %v", err)
+		logger.Criticalf("Failed setupUpdate: %v", err)
 		os.Exit(1)
 	}
 
-	t := time.NewTicker(updateDurr)
-	for {
-		<-t.C
-		err = uu.Check()
-		if err != nil {
-			logger.Warningf("Could not check for updates for the updater: %v", err)
-		}
-
-		if uu.ShouldRestart() {
-			logger.Warningf("Restarting due to update")
-			break
-		}
-
-		err = ubs.Check()
-		if err != nil {
-			logger.Warningf("Could not check for updates for barcode-scanner: %v", err)
-		}
-
-		// TODO health checks and update revert on detecting problems?
-	}
+	a.loop()
+	// TODO health checks and update revert on detecting problems?
 
 	os.Exit(0)
+}
+
+func getEnvVars() (baseURL string, token string, channelID int64) {
+	baseURL = os.Getenv("UPDATE_BASEURL")
+	if baseURL == "" {
+		logger.Criticalf("Empty UPDATE_BASEURL env var!")
+		os.Exit(1)
+	}
+
+	token = os.Getenv("TELEGRAM_TOKEN")
+	if token == "" {
+		logger.Criticalf("Empty TELEGRAM_TOKEN env var!")
+		os.Exit(1)
+	}
+
+	cid := os.Getenv("TELEGRAM_CHANNELID")
+	if cid == "" {
+		logger.Criticalf("Empty TELEGRAM_CHANNELID env var!")
+		os.Exit(1)
+	}
+
+	var err error
+	channelID, err = strconv.ParseInt(cid, 10, 64)
+	if err != nil {
+		logger.Criticalf("Failed parsing TELEGRAM_CHANNELID env var!")
+		os.Exit(1)
+	}
+
+	return
 }

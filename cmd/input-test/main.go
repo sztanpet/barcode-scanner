@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/signal"
 
-	"code.sztanpet.net/barcode-scanner/internal/tty"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/tty"
 )
 
 func main() {

@@ -3,8 +3,8 @@ package main
 import (
 	"unicode"
 
-	"code.sztanpet.net/barcode-scanner/internal/tty"
-	"code.sztanpet.net/barcode-scanner/internal/wifi"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/tty"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/wifi"
 )
 
 var wifiInfo struct {

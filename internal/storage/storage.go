@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"code.sztanpet.net/barcode-scanner/internal/file"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/file"
 	"github.com/go-sql-driver/mysql"
 	"github.com/juju/loggo"
 )

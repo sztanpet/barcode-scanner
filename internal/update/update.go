@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"time"
 
-	"code.sztanpet.net/barcode-scanner/internal/file"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/file"
 	"github.com/juju/loggo"
 )
 

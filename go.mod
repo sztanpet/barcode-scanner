@@ -1,4 +1,4 @@
-module code.sztanpet.net/barcode-scanner
+module code.sztanpet.net/zvpsz/barcode-scanner
 
 go 1.12
 
@@ -7,9 +7,6 @@ require (
 	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/kr/pretty v0.1.0 // indirect
-	github.com/mattn/go-isatty v0.0.8 // indirect
-	github.com/mattn/go-tty v0.0.0-20190424173100-523744f04859
-	github.com/pkg/errors v0.8.1
 	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 	golang.org/x/image v0.0.0-20190523035834-f03afa92d3ff
 	google.golang.org/appengine v1.6.1 // indirect
