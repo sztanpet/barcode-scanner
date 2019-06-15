@@ -3,15 +3,21 @@ package telegram
 import (
 	"context"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"golang.org/x/time/rate"
 )
+
+// MaxSendDurr configures the limiter to send at most 1 message per MaxSendDurr
+var MaxSendDurr = 500 * time.Millisecond
 
 type Bot struct {
 	ctx       context.Context
 	token     string
 	channelID int64
 	api       *tgbotapi.BotAPI
+	limiter   *rate.Limiter
 }
 
 func New(ctx context.Context, token string, channelID int64) (*Bot, error) {
@@ -25,15 +31,58 @@ func New(ctx context.Context, token string, channelID int64) (*Bot, error) {
 		token:     token,
 		channelID: channelID,
 		api:       api,
+		// limmit message spam to once every MaxSendDurr
+		limiter: rate.NewLimiter(rate.Every(MaxSendDurr), 1),
 	}
 	return t, nil
 }
 
 // Send sends a message to the channel, optionally sending notifications depending on disableNotification
-func (t *Bot) Send(txt string, disableNotification bool) error {
-	msg := tgbotapi.NewMessage(t.channelID, txt)
-	msg.DisableNotification = disableNotification
-	_, err := t.api.Send(msg)
+// internally ratelimited to once every 500ms
+func (t *Bot) Send(txt string, disableNotification bool) (err error) {
+	const postfixLength = 4
+	const maxMessageSize = 4096 // https://github.com/yagop/node-telegram-bot-api/issues/165
+	// 4*4096 bytes should be enough for everybody...
+	if len(txt) > 9*maxMessageSize {
+		panic("message too long")
+	}
+	s := []byte(txt)
+	i := 1
+	// send until there is something to send
+	for len(s) > 0 {
+		err = t.limiter.Wait(t.ctx)
+		if err != nil {
+			return err
+		}
+
+		end := maxMessageSize - postfixLength
+		if len(s) < end {
+			end = len(s)
+		}
+		tt := s
+		// do we need to cut the message?
+		if len(s) >= maxMessageSize {
+			tt = append(s[:0:0], s[:end]...) // copy s
+			tt = append(                     // append " (" + i + ")"
+				tt,
+				' ',
+				'(',
+				[]byte(string(48 + i))[0], // ascii 0 + i = "i"
+				')',
+			)
+			i++
+		}
+
+		// adjust s
+		if len(s) >= end {
+			s = s[end:]
+		}
+
+		msg := tgbotapi.NewMessage(t.channelID, string(tt))
+		msg.DisableNotification = disableNotification
+		_, err = t.api.Send(msg)
+	}
+
 	return err
 }
 
