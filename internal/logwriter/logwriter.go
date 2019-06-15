@@ -2,7 +2,6 @@ package logwriter
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
@@ -42,14 +41,14 @@ func (w *writer) Write(e loggo.Entry) {
 		needNotification := e.Level >= loggo.WARNING
 		err := w.bot.Send(line, !needNotification)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "bot send error: %v\n", err)
+			fmt.Printf("bot send error: %v\n", err)
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, e.Timestamp.Format("[2006-01-02 15:04:05] "))
-	fmt.Fprintf(os.Stderr, "%v:%v ", e.Filename, e.Line)
-	fmt.Fprintf(os.Stderr, line)
-	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Print(e.Timestamp.Format("[2006-01-02 15:04:05] "))
+	fmt.Printf("%v:%v ", e.Filename, e.Line)
+	fmt.Print(line)
+	fmt.Print("\n")
 }
 
 func (w *writer) formatEntry(e loggo.Entry) string {
@@ -57,8 +56,11 @@ func (w *writer) formatEntry(e loggo.Entry) string {
 	defer w.mu.Unlock()
 	defer w.builder.Reset()
 
+	// who can remember the order of the levels right?
+	// indicate the level like T1 for TRACE D2 for debug, etc
 	_, _ = w.builder.WriteRune('[')
 	_ = w.builder.WriteByte(e.Level.String()[0])
+	_, _ = w.builder.WriteString(string(48 + int(e.Level))) // poor mans strconv.Itoa
 	_, _ = w.builder.WriteRune('|')
 	_, _ = w.builder.WriteString(e.Module)
 	_, _ = w.builder.WriteString("] ")
