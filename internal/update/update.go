@@ -63,7 +63,6 @@ func (b *Binary) ShouldRestart() bool {
 
 // Cleanup removes the update signal file if present
 func (b *Binary) Cleanup() {
-	// eltavolitani a signal filet
 	_ = os.Remove(b.signalFile())
 }
 
@@ -72,6 +71,13 @@ func (b *Binary) signalFile() string {
 		file.TmpDir,
 		"UPD-"+filepath.Base(b.path),
 	)
+}
+
+func (b *Binary) HandleRevert(binaryname string) error {
+	// TODO check signal file/journalctl based on binary name
+	// if non-running/too many errors: revert
+	// block updates to same version?
+	return nil
 }
 
 func (b *Binary) Check() error {
