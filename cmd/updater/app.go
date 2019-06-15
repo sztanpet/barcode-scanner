@@ -53,7 +53,7 @@ func (a *app) setupUpdate() error {
 	a.binUpdate = binUpdate
 
 	// cleanup after ourselves
-	uu.Cleanup()
+	binUpdate.Cleanup()
 
 	binBarcode, err := update.NewBinary(bspath, a.baseURL+"/barcode-scanner")
 	if err != nil {
@@ -72,6 +72,8 @@ func (a *app) loop() {
 		case <-a.ctx.Done():
 			return
 		case <-t.C:
+			logger.Tracef("Checking for updates")
+
 			err := a.binUpdate.Check()
 			if err != nil {
 				logger.Warningf("Could not check for updates for the updater: %v", err)
