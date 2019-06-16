@@ -2,8 +2,7 @@ package logwriter
 
 import (
 	"fmt"
-	"strings"
-	"sync"
+	"path/filepath"
 
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/telegram"
 	"github.com/juju/loggo"
@@ -13,9 +12,6 @@ var defaultWriter *writer
 
 type writer struct {
 	bot *telegram.Bot
-
-	mu      sync.Mutex
-	builder strings.Builder
 }
 
 func Setup(bot *telegram.Bot) error {
@@ -52,20 +48,17 @@ func (w *writer) Write(e loggo.Entry) {
 }
 
 func (w *writer) formatEntry(e loggo.Entry) string {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	defer w.builder.Reset()
-
 	// who can remember the order of the levels right?
 	// indicate the level like T1 for TRACE D2 for debug, etc
-	_, _ = w.builder.WriteRune('[')
-	_ = w.builder.WriteByte(e.Level.String()[0])
-	_, _ = w.builder.WriteString(string(48 + int(e.Level))) // poor mans strconv.Itoa
-	_, _ = w.builder.WriteRune('|')
-	_, _ = w.builder.WriteString(e.Module)
-	_, _ = w.builder.WriteString("] ")
-	_, _ = w.builder.WriteString(e.Message)
-	return w.builder.String()
+	return fmt.Sprintf(
+		"[%v%v|%v:%v:%v] %v",
+		rune(e.Level.String()[0]),
+		int(e.Level),
+		e.Module,
+		filepath.Base(e.Filename),
+		e.Line,
+		e.Message,
+	)
 }
 
 // Config configures logging according to the specification

@@ -2,7 +2,6 @@ package telegram
 
 import (
 	"context"
-	"io"
 	"strings"
 	"time"
 
@@ -87,37 +86,16 @@ func (t *Bot) Send(txt string, disableNotification bool) (err error) {
 	return err
 }
 
-func (t *Bot) SendFile(reader io.Reader, msg string, disableNotification bool) error {
-	/*
-		TODO: upload to ix.io; with baseauth username channelid and password hashed channelid
-		and send message with link
-		// -F 'read:1=2'
-		$ echo Hello world. | curl -F 'f:1=<-' ix.io
-		0000: 50 4f 53 54 20 2f 20 48 54 54 50 2f 31 2e 31 0d POST / HTTP/1.1.
-		0010: 0a 48 6f 73 74 3a 20 69 78 2e 69 6f 0d 0a 55 73 .Host: ix.io..Us
-		0020: 65 72 2d 41 67 65 6e 74 3a 20 63 75 72 6c 2f 37 er-Agent: curl/7
-		0030: 2e 36 35 2e 31 0d 0a 41 63 63 65 70 74 3a 20 2a .65.1..Accept: *
-		0040: 2f 2a 0d 0a 43 6f 6e 74 65 6e 74 2d 4c 65 6e 67 /*..Content-Leng
-		0050: 74 68 3a 20 31 35 31 0d 0a 43 6f 6e 74 65 6e 74 th: 151..Content
-		0060: 2d 54 79 70 65 3a 20 6d 75 6c 74 69 70 61 72 74 -Type: multipart
-		0070: 2f 66 6f 72 6d 2d 64 61 74 61 3b 20 62 6f 75 6e /form-data; boun
-		0080: 64 61 72 79 3d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d dary=-----------
-		0090: 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 34 32 61 -------------42a
-		00a0: 37 36 64 38 64 37 64 63 33 31 36 38 33 0d 0a 0d 76d8d7dc31683...
-		00b0: 0a                                              .
-		0000: 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d ----------------
-		0010: 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 34 32 61 37 36 64 ----------42a76d
-		0020: 38 64 37 64 63 33 31 36 38 33 0d 0a 43 6f 6e 74 8d7dc31683..Cont
-		0030: 65 6e 74 2d 44 69 73 70 6f 73 69 74 69 6f 6e 3a ent-Disposition:
-		0040: 20 66 6f 72 6d 2d 64 61 74 61 3b 20 6e 61 6d 65  form-data; name
-		0050: 3d 22 66 3a 31 22 0d 0a 0d 0a 48 65 6c 6c 6f 20 ="f:1"....Hello
-		0060: 77 6f 72 6c 64 2e 0a 0d 0a 2d 2d 2d 2d 2d 2d 2d world....-------
-		0070: 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d 2d ----------------
-		0080: 2d 2d 2d 34 32 61 37 36 64 38 64 37 64 63 33 31 ---42a76d8d7dc31
-		0090: 36 38 33 2d 2d 0d 0a                            683--..
-	*/
+func (t *Bot) SendFile(data []byte, filename string, disableNotification bool) error {
+	r := tgbotapi.FileBytes{
+		Name:  filename,
+		Bytes: data,
+	}
 
-	return nil
+	d := tgbotapi.NewDocumentUpload(t.channelID, r)
+	d.DisableNotification = disableNotification
+	_, err := t.api.Send(d)
+	return err
 }
 
 // HandleUpdates receives bot events, and calls callback with received messages
