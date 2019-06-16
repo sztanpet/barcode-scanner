@@ -43,6 +43,7 @@ func main() {
 
 	a.loop()
 	// TODO health checks and update revert on detecting problems?
+	// https://www.freedesktop.org/software/systemd/man/systemd.service.html#ExecStopPost=
 
 	os.Exit(0)
 }

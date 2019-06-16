@@ -1,0 +1,31 @@
+updater:
+
+go get -u github.com/koblas/s3-cli
+
+$ cat ~/.s3cfg
+[default]
+access_key = foo
+secret_key = bar
+
+s3-cli sync --delete-removed /path/to/folder/ s3://bucket/key/on/s3/
+
+
+updater / barcode-scanner config:
+systemd environment file contents:
+
+UPDATE_BASEURL=
+TELEGRAM_TOKEN=
+TELEGRAM_CHANNELID=
+DATABASE_DSN=
+
+# swap setup
+echo 10 > /proc/sys/vm/swappiness
+mcedit /etc/sysctl.d/99-sysctl.conf
+
+touch /swapfile
+chmod 600 /swapfile
+dd if=/dev/zero of=/swapfile bs=1M count=512 status=progress
+mkswap /swapfile
+swapon /swapfile
+
+echo "/swapfile none swap defaults 0 0" >> fstab
