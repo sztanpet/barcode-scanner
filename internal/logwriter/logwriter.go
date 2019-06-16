@@ -60,13 +60,3 @@ func (w *writer) formatEntry(e loggo.Entry) string {
 		e.Message,
 	)
 }
-
-// Config configures logging according to the specification
-// specification is a loggo.ConfigString
-func (w *writer) Config(specification string) error {
-	if err := loggo.ConfigureLoggers(specification); err != nil {
-		return err
-	}
-
-	return nil
-}

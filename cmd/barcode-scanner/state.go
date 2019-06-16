@@ -66,6 +66,8 @@ func (a *app) handleBarcodeDone() {
 		return
 	}
 
+	// TODO handle INGRESS- and EGRESS barcodes
+
 	// TODO assemble storage.Barcode and insert it, retrying as needed
 	a.currentLine.Reset()
 }

@@ -44,6 +44,7 @@ var pathProcessDurr = 1 * time.Minute
 
 // TODO mysql: use ssl connections only, SET GLOBAL require_secure_transport ON
 // dsn options: ?loc=UTC&parseTime=true&strict=true&timeout=1s&time_zone="+00:00"
+// TODO refaactor, New has to work without internet
 
 // New expects a directory path as its argument.
 // If the directory cannot be created an error is returned

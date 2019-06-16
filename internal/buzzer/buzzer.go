@@ -1,3 +1,5 @@
+// buzzer uses the linux pwm driver to generate tones for a piezzo buzzer
+// more info: blog.oddbit.com/post/2017-09-26-some-notes-on-pwm-on-the-raspberry-pi
 package buzzer
 
 import (
@@ -47,6 +49,21 @@ func Setup() error {
 	}
 
 	return nil
+}
+
+// TODO something two-tone, need to refactor this shit for that, maybe one day
+func StartupBeep() (err error) {
+	defer disable()
+
+	err = write(pwmBase+port+"/enable", "1")
+	if err != nil {
+		return err
+	}
+
+	<-time.After(beepDurr / 3)
+
+	err = write(pwmBase+port+"/enable", "0")
+	return
 }
 
 func SuccessBeep() (err error) {
