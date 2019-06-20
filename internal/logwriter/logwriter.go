@@ -8,8 +8,6 @@ import (
 	"github.com/juju/loggo"
 )
 
-var defaultWriter *writer
-
 type writer struct {
 	bot *telegram.Bot
 }
@@ -20,7 +18,7 @@ func Setup(bot *telegram.Bot) error {
 		return err
 	}
 
-	defaultWriter = &writer{
+	defaultWriter := &writer{
 		bot: bot,
 	}
 	err = loggo.RegisterWriter("default", defaultWriter)

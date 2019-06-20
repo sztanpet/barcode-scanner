@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"time"
 
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/config"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/file"
 	"github.com/juju/loggo"
 )
@@ -40,15 +41,15 @@ type info struct {
 	BinaryPath string
 }
 
-func NewBinary(path, baseURL string) (*Binary, error) {
-	h, err := getFileSha(path)
+func NewBinary(binPath string, cfg *config.Config) (*Binary, error) {
+	h, err := getFileSha(binPath)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Binary{
-		baseURL: baseURL,
-		path:    path,
+		baseURL: cfg.UpdateBaseURL + "/" + filepath.Base(binPath),
+		path:    binPath,
 		hash:    h,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
@@ -71,13 +72,6 @@ func (b *Binary) signalFile() string {
 		file.TmpDir,
 		"UPD-"+filepath.Base(b.path),
 	)
-}
-
-func (b *Binary) HandleRevert(binaryname string) error {
-	// TODO check signal file/journalctl based on binary name
-	// if non-running/too many errors: revert
-	// block updates to same version?
-	return nil
 }
 
 func (b *Binary) Check() error {
@@ -115,9 +109,10 @@ func (b *Binary) Check() error {
 	return b.download(nfo)
 }
 
-// update.sztanpet.net/barcode-scanner/linux-arm/version.json
+// domain.tld/<binary-base-name>/<GOOS>-<GOARCH>/<file>
+// ex: domain.tld/barcode-scanner/linux-arm/version.json
 // version.json: {"hash":"abcdef123456789", "binaryPath":"barcode-scanner"}
-// binary-path -> update.sztanpet.net/barcode-scanner/linux-arm/barcode-scanner
+// binary-path -> domain.tld/barcode-scanner/linux-arm/barcode-scanner
 func (b *Binary) getURL(file string) string {
 	v := url.Values{}
 	v.Set("currentSha", hex.EncodeToString(b.hash))

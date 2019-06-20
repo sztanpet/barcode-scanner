@@ -3,12 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"time"
 
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/config"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/logwriter"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/status"
 
@@ -23,35 +22,26 @@ import (
 type direction int
 
 const (
-	UNKNOWN direction = iota
+	EGRESS direction = iota
 	INGRESS
-	EGRESS
 )
 
+// TODO https://vincent.bernat.ch/en/blog/2017-systemd-golang
+// TODO reverter binary
 type app struct {
-	ctx  context.Context
-	exit context.CancelFunc
+	ctx     context.Context
+	exit    context.CancelFunc
+	cfg     *config.Config
+	screen  *display.Screen
+	status  *status.Status
+	storage *storage.Storage
+	bot     *telegram.Bot
 
 	state       State
 	currentLine bytes.Buffer
 	dir         direction
-	extradata   string
-
-	screen *display.Screen
-
-	status *status.Status
-
-	storageDSN string
-	storage    *storage.Storage
-
-	botToken     string
-	botChannelID int64
-	bot          *telegram.Bot
-
-	updateBaseURL string
-	statePath     string
-
-	activity chan struct{}
+	currier     string
+	activity    chan struct{}
 }
 
 var logger = loggo.GetLogger("barcode-scanner")
@@ -61,15 +51,12 @@ var (
 )
 
 func main() {
-	baseURL, dsn, token, channelID := getEnvVars()
+	cfg := config.Get()
 	ctx, exit := context.WithCancel(context.Background())
 	a := &app{
-		ctx:           ctx,
-		exit:          exit,
-		botToken:      token,
-		botChannelID:  channelID,
-		storageDSN:    dsn,
-		updateBaseURL: baseURL,
+		ctx:  ctx,
+		exit: exit,
+		cfg:  cfg,
 	}
 	// logging sends messages to telegram, so it depends on it
 	// TODO make telegram persist unsendable messages and retry automatically?
@@ -107,54 +94,23 @@ func main() {
 	os.Exit(0)
 }
 
-func getEnvVars() (baseURL string, dsn, token string, channelID int64) {
-	baseURL = os.Getenv("UPDATE_BASEURL")
-	if baseURL == "" {
-		logger.Criticalf("Empty UPDATE_BASEURL env var!")
-		os.Exit(1)
-	}
-
-	dsn = os.Getenv("DATABASE_DSN")
-	if dsn == "" {
-		logger.Criticalf("Empty DATABASE_DSN env var!")
-		os.Exit(1)
-	}
-
-	token = os.Getenv("TELEGRAM_TOKEN")
-	if token == "" {
-		logger.Criticalf("Empty TELEGRAM_TOKEN env var!")
-		os.Exit(1)
-	}
-
-	cid := os.Getenv("TELEGRAM_CHANNELID")
-	if cid == "" {
-		logger.Criticalf("Empty TELEGRAM_CHANNELID env var!")
-		os.Exit(1)
-	}
-
-	var err error
-	channelID, err = strconv.ParseInt(cid, 10, 64)
-	if err != nil {
-		logger.Criticalf("Failed parsing TELEGRAM_CHANNELID env var!")
-		os.Exit(1)
-	}
-
-	return
-}
-
 func (a *app) handleSignals() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c)
 	go func(c chan os.Signal) {
 		s := <-c
-		// TODO exit unconditionally on any signal?
-		fmt.Println("Got signal:", s)
+		// exit unconditionally on any signal
+		logger.Warningf("Got signal: %s, exiting clearnly", s)
+		a.exit()
 	}(c)
 }
 
 func (a *app) setupLogging() {
 	_, _ = loggo.RemoveWriter("default")
-	logwriter.Setup(a.bot)
+	err := logwriter.Setup(a.bot)
+	if err != nil {
+		panic("logwriter setup failed, impossible")
+	}
 }
 
 func (a *app) setupUpdate() {
@@ -162,7 +118,7 @@ func (a *app) setupUpdate() {
 }
 
 func (a *app) setupStorage() {
-	storage, err := storage.New(a.ctx, a.statePath+"/storage", a.storageDSN)
+	storage, err := storage.New(a.ctx, a.cfg)
 	if err != nil {
 		logger.Criticalf("failed to initialize storage: %v", err)
 		os.Exit(1)
@@ -172,7 +128,7 @@ func (a *app) setupStorage() {
 }
 
 func (a *app) setupTelegram() {
-	bot, err := telegram.New(a.ctx, a.botToken, a.botChannelID)
+	bot, err := telegram.New(a.ctx, a.cfg)
 	if err != nil {
 		return
 	}

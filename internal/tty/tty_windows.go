@@ -14,8 +14,7 @@ func Open(ctx context.Context) (*TTY, error) {
 	return nil, errors.New("unimplemented")
 }
 
-func (t *TTY) RestoreTermMode() error {
-	return errors.New("unimplemented")
+func (t *TTY) RestoreTermMode() {
 }
 
 func (t *TTY) Buffered() bool {

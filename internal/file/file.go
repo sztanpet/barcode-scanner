@@ -10,11 +10,6 @@ import (
 
 var TmpDir = filepath.Join(os.TempDir(), "barcode-scanner")
 
-/*
-func init() {
-	TmpDir = filepath.Join(os.TempDir(), "barcode-scanner")
-}
-*/
 func Serialize(path string, data interface{}) error {
 	tf, err := ioutil.TempFile(filepath.Dir(path), filepath.Base(path))
 	if err != nil {

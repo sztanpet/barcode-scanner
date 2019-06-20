@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/config"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/file"
 	"github.com/go-sql-driver/mysql"
 	"github.com/juju/loggo"
@@ -52,9 +53,10 @@ var pathProcessDurr = 1 * time.Minute
 
 // New expects a directory path as its argument.
 // If the directory cannot be created an error is returned
-func New(ctx context.Context, path, dsn string) (*Storage, error) {
+func New(ctx context.Context, cfg *config.Config) (*Storage, error) {
+	path := filepath.Join(cfg.StatePath, "storage")
 	// Open doesn't open a connection to validate the DSN!
-	db, err := sql.Open("mysql", dsn)
+	db, err := sql.Open("mysql", cfg.DatabaseDSN)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +73,7 @@ func New(ctx context.Context, path, dsn string) (*Storage, error) {
 	s := &Storage{
 		ctx:    ctx,
 		path:   path,
-		dsn:    dsn,
+		dsn:    cfg.DatabaseDSN,
 		db:     db,
 		inBuf:  map[[20]byte]Barcode{},
 		insert: make(chan inData, 1),

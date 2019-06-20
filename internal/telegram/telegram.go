@@ -2,9 +2,12 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"strings"
+	"sync"
 	"time"
 
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/config"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"golang.org/x/time/rate"
 )
@@ -16,36 +19,58 @@ type Bot struct {
 	ctx       context.Context
 	token     string
 	channelID int64
-	api       *tgbotapi.BotAPI
 	limiter   *rate.Limiter
+
+	mu  sync.Mutex
+	api *tgbotapi.BotAPI
 }
 
-func New(ctx context.Context, token string, channelID int64) (*Bot, error) {
-	api, err := tgbotapi.NewBotAPI(token)
+func New(ctx context.Context, cfg *config.Config) *Bot {
+	api, err := tgbotapi.NewBotAPI(cfg.TelegramToken)
 	if err != nil {
-		return nil, err
+		api = nil
 	}
 
 	t := &Bot{
 		ctx:       ctx,
-		token:     token,
-		channelID: channelID,
+		token:     cfg.TelegramToken,
+		channelID: cfg.TelegramChannelID,
 		api:       api,
 		// limmit message spam to once every MaxSendDurr
 		limiter: rate.NewLimiter(rate.Every(MaxSendDurr), 1),
 	}
-	return t, nil
+	return t
+}
+
+func (t *Bot) ensureAPI() (err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.api != nil {
+		return nil
+	}
+
+	t.api, err = tgbotapi.NewBotAPI(t.token)
+	return
 }
 
 // Send sends a message to the channel, optionally sending notifications depending on disableNotification
 // internally ratelimited to once every 500ms
 func (t *Bot) Send(txt string, disableNotification bool) (err error) {
+	err = t.ensureAPI()
+	if err != nil {
+		return err
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	const postfixLength = 4
 	const maxMessageSize = 4096 // https://github.com/yagop/node-telegram-bot-api/issues/165
-	// 4*4096 bytes should be enough for everybody...
-	if len(txt) > 9*maxMessageSize {
-		panic("message too long")
+	// 9*4092 bytes should be enough for everybody...
+	if len(txt) > 9*(maxMessageSize-postfixLength) {
+		return errors.New("Message too long")
 	}
+
 	s := []byte(txt)
 	i := 1
 	// send until there is something to send
@@ -87,6 +112,13 @@ func (t *Bot) Send(txt string, disableNotification bool) (err error) {
 }
 
 func (t *Bot) SendFile(data []byte, filename string, disableNotification bool) error {
+	err := t.ensureAPI()
+	if err != nil {
+		return err
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	r := tgbotapi.FileBytes{
 		Name:  filename,
 		Bytes: data,
@@ -94,13 +126,20 @@ func (t *Bot) SendFile(data []byte, filename string, disableNotification bool) e
 
 	d := tgbotapi.NewDocumentUpload(t.channelID, r)
 	d.DisableNotification = disableNotification
-	_, err := t.api.Send(d)
+	_, err = t.api.Send(d)
 	return err
 }
 
 // HandleUpdates receives bot events, and calls callback with received messages
 // old bot events are replayed on calling the method, except when onlyNewUpdates is true
 func (t *Bot) HandleUpdates(callback func(msg string), onlyNewUpdates bool) error {
+	err := t.ensureAPI()
+	if err != nil {
+		return err
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates, err := t.api.GetUpdatesChan(u)

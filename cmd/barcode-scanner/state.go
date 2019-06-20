@@ -16,7 +16,7 @@ const (
 )
 
 func (a *app) transitionState(r rune) {
-	logger.Debugf("key pressed: %x %q", r, r)
+	logger.Tracef("key pressed: %x %q", r, r)
 
 	switch a.state {
 	case wifiSetupSSID, wifiSetupPW:
@@ -67,6 +67,8 @@ func (a *app) handleBarcodeDone() {
 	}
 
 	// TODO handle INGRESS- and EGRESS barcodes
+	// persist the current setting
+	// if 6hours of idleness pass, reset to EGRESS, delete setting
 
 	// TODO assemble storage.Barcode and insert it, retrying as needed
 	a.currentLine.Reset()
