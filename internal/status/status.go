@@ -19,11 +19,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/telegram"
 	"github.com/juju/loggo"
-	"golang.org/x/sys/unix"
 )
 
 var logger = loggo.GetLogger("main.status")
@@ -99,8 +99,8 @@ func (s *Status) sysinfo() {
 	var freeRamPerc float64
 	var freeSwapPerc float64
 	{
-		si := unix.Sysinfo_t{}
-		err := unix.Sysinfo(&si)
+		si := syscall.Sysinfo_t{}
+		err := syscall.Sysinfo(&si)
 		if err != nil {
 			logger.Warningf("sysinfo failed: %v", err)
 			return
@@ -127,8 +127,8 @@ func (s *Status) sysinfo() {
 	// from https://gist.github.com/lunny/9828326
 	var freeRootPerc float64
 	{
-		fs := unix.Statfs_t{}
-		err := unix.Statfs("/", &fs)
+		fs := syscall.Statfs_t{}
+		err := syscall.Statfs("/", &fs)
 		if err != nil {
 			logger.Warningf("statfs failed: %v", err)
 			return
