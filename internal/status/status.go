@@ -1,3 +1,6 @@
+// +build !windows
+// +build !plan9
+
 // status implements monitoring of system status
 // checks for new dmesg output and logs it
 // checks for any error output from binaries
