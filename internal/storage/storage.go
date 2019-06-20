@@ -2,11 +2,13 @@ package storage
 
 import (
 	"context"
+	"crypto/sha1"
 	"database/sql"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/file"
@@ -20,10 +22,13 @@ type Storage struct {
 	path   string
 	dsn    string
 	db     *sql.DB
-	istmt  *sql.Stmt
 	insert chan inData
 
-	lastProcessed time.Time
+	stmtMu sync.RWMutex
+	inStmt *sql.Stmt
+
+	bufMu sync.Mutex
+	inBuf map[[20]byte]Barcode
 }
 
 type inData struct {
@@ -33,10 +38,10 @@ type inData struct {
 
 // Barcode represents the data to tbe inserted
 type Barcode struct {
-	Data      string
-	Direction string
-	ExtraData string
-	CreatedAt time.Time
+	Barcode        string
+	Direction      string
+	CurrierService string
+	CreatedAt      time.Time
 }
 
 var logger = loggo.GetLogger("main.storage")
@@ -44,15 +49,19 @@ var pathProcessDurr = 1 * time.Minute
 
 // TODO mysql: use ssl connections only, SET GLOBAL require_secure_transport ON
 // dsn options: ?loc=UTC&parseTime=true&strict=true&timeout=1s&time_zone="+00:00"
-// TODO refaactor, New has to work without internet
 
 // New expects a directory path as its argument.
 // If the directory cannot be created an error is returned
 func New(ctx context.Context, path, dsn string) (*Storage, error) {
-	db, err := checkDSN(ctx, dsn)
+	// Open doesn't open a connection to validate the DSN!
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
 	}
+
+	db.SetConnMaxLifetime(30 * time.Second)
+	db.SetMaxIdleConns(3)
+	db.SetMaxOpenConns(3)
 
 	err = os.MkdirAll(path, 0700)
 	if err != nil {
@@ -64,66 +73,62 @@ func New(ctx context.Context, path, dsn string) (*Storage, error) {
 		path:   path,
 		dsn:    dsn,
 		db:     db,
-		insert: make(chan inData, 2),
+		inBuf:  map[[20]byte]Barcode{},
+		insert: make(chan inData, 1),
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	stmt, err := db.PrepareContext(ctx, `
-		INSERT INTO barcodes (data, direction, extradata, createdat, timestamp)
-		VALUES (?, ?, ?, ?, NOW())
-	`)
-	if err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	s.istmt = stmt
 
 	go s.consumeData()
 
 	return s, nil
 }
 
-func checkDSN(ctx context.Context, dsn string) (*sql.DB, error) {
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, err
-	}
-
-	db.SetConnMaxLifetime(5 * time.Second)
-	db.SetMaxIdleConns(3)
-	db.SetMaxOpenConns(3)
-
-	// Open doesn't open a connection to validate the DSN
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+// TestConnection can be used to test whether the provided DSN actually works
+// and to make sure the connection to the database is alive
+func (s *Storage) TestConnection() error {
+	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
 	defer cancel()
-	err = db.PingContext(ctx)
-	if err != nil {
-		return nil, err
-	}
 
-	return db, nil
+	return s.db.PingContext(ctx)
+}
+
+func (s *Storage) pathForBarcode(data Barcode) string {
+	return filepath.Join(s.path, strconv.FormatInt(data.CreatedAt.UnixNano(), 10))
 }
 
 // Insert persists the Barcode data to disk for resilience
-// and then tries to insert it into the DB.
-// On failure it is the callers job to call Insert again with the data.
-func (s *Storage) Insert(data Barcode) error {
+// and tries to insert it into the DB.
+func (s *Storage) Insert(data Barcode) {
+	if data.CreatedAt.IsZero() {
+		panic("Barcode.CreatedAt cannot be zero")
+	}
+
 	// persist data to disk first
 	// assumption: UnixNano() will give us a safely unique and nicely sortable filename
-	dp := filepath.Join(s.path, strconv.FormatInt(time.Now().UnixNano(), 10))
-	err := file.Serialize(dp, &data)
+	dp := s.pathForBarcode(data)
+	_ = file.Serialize(dp, &data)
+
+	// insert the data into an in-memory buffer of Barcodes too, to protect against the case where:
+	// - persisting fails and inserting fails
+	// - persisting fails and insert channel would block
+	// - recognize if the assumption about UnixNano does not hold
+	//
+	// this might cause memory exhaustion but at least we tried our best to not loose data
+	s.bufMu.Lock()
+	ix := sha1.Sum([]byte(dp))
+	if _, ok := s.inBuf[ix]; ok {
+		panic("duplicate index found, assumption does not hold")
+	}
+	s.inBuf[ix] = data
+	s.bufMu.Unlock()
+	logger.Infof("Insert: sending on storage.insert would have blocked, message buffered")
 
 	// try to send the data up to the DB asap, on success the serialized file will be deleted
 	select {
 	case <-s.ctx.Done():
 		// was the context already cancelled?
-		return err
 	case s.insert <- inData{path: dp, data: data}:
 	default:
-		logger.Infof("Insert: sending on storage.insert would have blocked, message dropped")
 	}
-	return err
 }
 
 // consumeData listens on the Storage.insert channel for things to insert.
@@ -131,7 +136,12 @@ func (s *Storage) Insert(data Barcode) error {
 // It regularly processes any persisted data files and tries to insert them.
 func (s *Storage) consumeData() {
 	t := time.NewTicker(pathProcessDurr)
-	var runWhenIdle bool
+	var cancel context.CancelFunc
+	defer func() {
+		if cancel != nil {
+			cancel()
+		}
+	}()
 
 	for {
 		select {
@@ -151,37 +161,71 @@ func (s *Storage) consumeData() {
 					// we should just try and remove the file again
 					logger.Errorf("Failed to remove path: %v error was: %v", in.path, err)
 				}
+
+				// delete from in-memory buffer of barcodes
+				s.bufMu.Lock()
+				ix := sha1.Sum([]byte(in.path))
+				delete(s.inBuf, ix)
+				s.bufMu.Unlock()
 			}
+			// otherwise just ignore the error, processPath and processBuf will retry the insert later
 
 		case <-t.C:
-			runWhenIdle = s.processPath(runWhenIdle)
-		default:
-			if runWhenIdle {
-				runWhenIdle = s.processPath(runWhenIdle)
+			if cancel != nil {
+				cancel()
+				cancel = nil
 			}
+			var ctx context.Context
+			ctx, cancel = context.WithCancel(s.ctx)
+			go func() {
+				s.processBuf(ctx)
+				s.processPath(ctx)
+			}()
+		}
+	}
+}
+
+func (s *Storage) processBuf(ctx context.Context) {
+	s.bufMu.Lock()
+	now := time.Now()
+	var toInsert []inData
+	for _, data := range s.inBuf {
+		if diff := now.Sub(data.CreatedAt); diff < 0 || diff < time.Second {
+			continue
 		}
 
+		toInsert = append(toInsert, inData{
+			path: s.pathForBarcode(data),
+			data: data,
+		})
+	}
+	s.bufMu.Unlock()
+
+	if len(toInsert) == 0 {
+		return
+	}
+
+	logger.Tracef("number of barcodes buffered: %v", len(toInsert))
+	for _, in := range toInsert {
+		select {
+		case <-ctx.Done():
+			return
+		case s.insert <- in:
+		}
 	}
 }
 
 // processPath tries to retries inserting the persisted data in Storage.path.
 // The return value is whether it should re-run when the loop in consumeData is idle.
 // draining makes sure we dont swallow runWhenIdle when hitting the rate limit.
-func (s *Storage) processPath(draining bool) (runWhenIdle bool) {
-	// make sure to not run too often, once every 5 seconds should be plenty
-	now := time.Now()
-	if now.Before(s.lastProcessed.Add(5 * time.Second)) {
-		return draining
-	}
-	s.lastProcessed = now
-
+func (s *Storage) processPath(ctx context.Context) {
 	files, err := ioutil.ReadDir(s.path)
 	if err != nil {
-		logger.Errorf("processPath: listing s.path failed (%v), skipping processing", err)
-		return false
+		logger.Errorf("listing s.path failed (%v), skipping processing", err)
+		return
 	}
 
-	logger.Tracef("processPath: number of files buffered: %v", len(files))
+	logger.Tracef("number of files to insert: %v", len(files))
 	for _, f := range files {
 		id := inData{
 			path: filepath.Join(s.path, f.Name()),
@@ -189,33 +233,35 @@ func (s *Storage) processPath(draining bool) (runWhenIdle bool) {
 
 		err := file.Unserialize(id.path, &id.data)
 		if err != nil {
-			logger.Errorf("processPath: failed unseralizing %v, error was: %v", id.path, err)
+			logger.Errorf("failed unseralizing %v, error was: %v", id.path, err)
 			continue
 		}
 
 		select {
+		case <-ctx.Done():
+			return
 		case s.insert <- id:
-		default:
-			// abort the processing entirely to not overwhelm insertion
-			// restart on idle to drain the directory asap
-			logger.Infof("processPath: blocked on insert channel for path %v, aborting", id.path)
-			return true
 		}
 	}
-
-	return false
 }
 
 func (s *Storage) dbInsert(row Barcode) error {
+	err := s.ensureStatement()
+	if err != nil {
+		return err
+	}
+
+	s.stmtMu.RLock()
+	defer s.stmtMu.RUnlock()
+
 	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
 	defer cancel()
-
 	// the result is irrelevant, only the error matters
-	_, err := s.istmt.ExecContext(
+	_, err = s.inStmt.ExecContext(
 		ctx,
-		row.Data,
+		row.Barcode,
 		row.Direction,
-		row.ExtraData,
+		row.CurrierService,
 		row.CreatedAt.UnixNano(),
 	)
 
@@ -235,6 +281,36 @@ func (s *Storage) dbInsert(row Barcode) error {
 
 		return err
 	}
+
+	return nil
+}
+
+func (s *Storage) ensureStatement() error {
+	// take read lock first to check if inStmt is nil or not
+	// and if it is, take a write lock to set it
+	s.stmtMu.RLock()
+	if s.inStmt != nil {
+		s.stmtMu.RUnlock()
+		return nil
+	}
+	s.stmtMu.RUnlock()
+
+	// db.Stmt is safe to use concurrently, but it is not safe
+	// for us to modify the pointer pointing to it concurrently
+	s.stmtMu.Lock()
+	defer s.stmtMu.Unlock()
+
+	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
+	defer cancel()
+	stmt, err := s.db.PrepareContext(ctx, `
+		INSERT INTO barcodes (barcode, direction, currier_service, created_at, timestamp)
+		VALUES (?, ?, ?, ?, NOW())
+	`)
+	if err != nil {
+		_ = s.db.Close()
+		return err
+	}
+	s.inStmt = stmt
 
 	return nil
 }
