@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/sh1106"
 	"github.com/golang/freetype/truetype"
 	"github.com/juju/loggo"
 	"golang.org/x/image/font"
@@ -15,7 +16,6 @@ import (
 	"golang.org/x/image/font/inconsolata"
 	"golang.org/x/image/math/fixed"
 	"periph.io/x/periph/conn/i2c/i2creg"
-	"periph.io/x/periph/devices/ssd1306"
 	"periph.io/x/periph/devices/ssd1306/image1bit"
 	"periph.io/x/periph/host"
 )
@@ -37,7 +37,7 @@ const black = image1bit.Off
 
 type Screen struct {
 	ctx context.Context
-	dev *ssd1306.Dev
+	dev *sh1106.Dev
 
 	mu         sync.Mutex
 	img        *image1bit.VerticalLSB
@@ -69,15 +69,15 @@ func NewScreen(ctx context.Context) (*Screen, error) {
 		return nil, err
 	}
 
-	opts := ssd1306.DefaultOpts
+	opts := sh1106.DefaultOpts
 	opts.Rotated = false // TODO finalize physical position of screen
-	dev, err := ssd1306.NewI2C(b, &opts)
+	dev, err := sh1106.NewI2C(b, &opts)
 	if err != nil {
-		logger.Criticalf("could not find ssd1306 screen, display disabled: %v", err)
+		logger.Criticalf("could not find sh1106 screen, display disabled: %v", err)
 		return nil, err
 	}
 
-	_ = dev.SetContrast(0x0f)
+	_ = dev.SetContrast(0xFF)
 
 	img := image1bit.NewVerticalLSB(dev.Bounds())
 
@@ -142,7 +142,7 @@ func (s *Screen) WriteTitle(text string) error {
 	s.lines[0] = text
 
 	s.writeUnlocked(titleFont, 0, black, true, text)
-	return s.Draw()
+	return s.drawUnlocked()
 }
 
 // WriteLine writes the text in white on black into the indicated line (usually #1 or #2)
