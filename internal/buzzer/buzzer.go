@@ -5,6 +5,7 @@ package buzzer
 import (
 	"io"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -13,12 +14,122 @@ const port = "/pwm0"
 const beepDurr = 150 * time.Millisecond
 
 var exported bool
+var lastBeep time.Time
+var running sync.Mutex
+var once sync.Once
 
-func Setup() error {
+func Setup() (err error) {
+	running.Lock()
+	defer running.Unlock()
+
+	once.Do(func() {
+		go checkLastBeep()
+	})
+
+	if err = ensureExported(); err != nil {
+		return err
+	}
+
+	deNoise()
+	return
+}
+
+// TODO something two-tone, need to refactor this shit for that, maybe one day
+func StartupBeep() (err error) {
+	running.Lock()
+	defer running.Unlock()
+	defer markLastBeep()
+	defer disable()
+
+	if err = ensureExported(); err != nil {
+		return err
+	}
+
+	enable()
+	<-time.After(beepDurr / 3)
+	disable()
+	return
+}
+
+func SuccessBeep() (err error) {
+	running.Lock()
+	defer running.Unlock()
+	defer markLastBeep()
+	defer disable()
+
+	if err = ensureExported(); err != nil {
+		return err
+	}
+
+	enable()
+	<-time.After(beepDurr)
+	disable()
+	return
+}
+
+func FailBeep() (err error) {
+	running.Lock()
+	defer running.Unlock()
+	defer markLastBeep()
+	defer disable()
+
+	if err = ensureExported(); err != nil {
+		return err
+	}
+
+	for i := 0; i < 4; i++ {
+		enable()
+		<-time.After(beepDurr / 2)
+		disable()
+		<-time.After(beepDurr / 2)
+	}
+
+	return
+}
+
+func markLastBeep() {
+	lastBeep = time.Now()
+}
+
+func checkLastBeep() {
+	t := time.NewTicker(5 * time.Minute)
+	for {
+		now := <-t.C
+
+		running.Lock()
+		if !exported {
+			continue
+		}
+
+		if lastBeep.Add(5 * time.Minute).After(now) {
+			continue
+		}
+
+		deNoise()
+		running.Unlock()
+	}
+}
+
+// deNoise silences any noise on the buzzer while idle.
+// Depending on CPU usage seemingly, the transistor controlling the
+// piezo buzzer drifts into it's active region because the noise on the
+// pwm output becomes so big. This causes the components to heat up unnecessarily.
+// The problem can be sidestepped by momentarily switching the output on.
+func deNoise() {
+	enable()
+	disable()
+	markLastBeep()
+}
+
+func ensureExported() error {
 	// echo 0 > /sys/class/pwm/pwmchip0/export
 	// 2068hz
 	// echo 241779 > /sys/class/pwm/pwmchip0/pwm0/duty_cycle
 	// echo 483558 > /sys/class/pwm/pwmchip0/pwm0/period
+
+	if exported {
+		return nil
+	}
 
 	// already exported?
 	if _, err := os.Stat(pwmBase + port); err == nil {
@@ -48,54 +159,33 @@ func Setup() error {
 		return err
 	}
 
+	deNoise()
 	return nil
 }
 
-// TODO something two-tone, need to refactor this shit for that, maybe one day
-func StartupBeep() (err error) {
-	defer disable()
-
-	err = write(pwmBase+port+"/enable", "1")
-	if err != nil {
-		return err
-	}
-
-	<-time.After(beepDurr / 3)
-
-	err = write(pwmBase+port+"/enable", "0")
-	return
+func unexport() {
+	_ = write(pwmBase+"/unexport", "0")
+	exported = false
 }
 
-func SuccessBeep() (err error) {
-	defer disable()
-
-	err = write(pwmBase+port+"/enable", "1")
-	if err != nil {
-		return err
+func enable() {
+	if !exported {
+		return
 	}
 
-	<-time.After(beepDurr)
-
-	err = write(pwmBase+port+"/enable", "0")
-	return
+	if err := write(pwmBase+port+"/enable", "1"); err != nil {
+		unexport()
+	}
 }
 
-func FailBeep() (err error) {
-	defer disable()
-
-	for i := 0; i < 4; i++ {
-		err = write(pwmBase+port+"/enable", "1")
-		if err != nil {
-			return err
-		}
-
-		<-time.After(beepDurr / 2)
-
-		err = write(pwmBase+port+"/enable", "0")
-
-		<-time.After(beepDurr / 2)
+func disable() {
+	if !exported {
+		return
 	}
-	return
+
+	if err := write(pwmBase+port+"/enable", "0"); err != nil {
+		unexport()
+	}
 }
 
 func write(path, value string) error {
@@ -115,8 +205,4 @@ func write(path, value string) error {
 	}
 
 	return nil
-}
-
-func disable() {
-	_ = write(pwmBase+port+"/enable", "0")
 }
