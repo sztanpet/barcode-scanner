@@ -84,12 +84,12 @@ func (t *Bot) Send(txt string, disableNotification bool) (err error) {
 		if len(s) < end {
 			end = len(s)
 		}
-		tt := s
+		frag := s
 		// do we need to cut the message?
 		if len(s) >= maxMessageSize {
-			tt = append(s[:0:0], s[:end]...) // copy s
-			tt = append(                     // append " (" + i + ")"
-				tt,
+			frag = append(s[:0:0], s[:end]...) // copy s
+			frag = append(                     // append " (" + i + ")"
+				frag,
 				' ',
 				'(',
 				[]byte(string(48 + i))[0], // ascii 0 + i = "i"
@@ -103,7 +103,7 @@ func (t *Bot) Send(txt string, disableNotification bool) (err error) {
 			s = s[end:]
 		}
 
-		msg := tgbotapi.NewMessage(t.channelID, string(tt))
+		msg := tgbotapi.NewMessage(t.channelID, string(frag))
 		msg.DisableNotification = disableNotification
 		_, err = t.api.Send(msg)
 	}
@@ -132,7 +132,7 @@ func (t *Bot) SendFile(data []byte, filename string, disableNotification bool) e
 
 // HandleUpdates receives bot events, and calls callback with received messages
 // old bot events are replayed on calling the method, except when onlyNewUpdates is true
-func (t *Bot) HandleUpdates(callback func(msg string), onlyNewUpdates bool) error {
+func (t *Bot) HandleMessage(callback func(msg string), onlyNewUpdates bool) error {
 	err := t.ensureAPI()
 	if err != nil {
 		return err

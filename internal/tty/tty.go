@@ -62,7 +62,7 @@ func (t *TTY) disableEcho() error {
 }
 
 func (t *TTY) RestoreTermMode() {
-	_, _, _ := syscall.Syscall6(syscall.SYS_IOCTL, uintptr(t.in.Fd()), syscall.TCSETS, uintptr(unsafe.Pointer(&t.term)), 0, 0, 0)
+	_, _, _ = syscall.Syscall6(syscall.SYS_IOCTL, uintptr(t.in.Fd()), syscall.TCSETS, uintptr(unsafe.Pointer(&t.term)), 0, 0, 0)
 }
 
 func (t *TTY) Buffered() bool {

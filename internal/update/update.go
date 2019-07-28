@@ -25,6 +25,7 @@ var logger = loggo.GetLogger("main.update")
 var ErrFileInvalid = errors.New("File failed integrity check")
 
 type Binary struct {
+	Name string
 	// the baseURL to contact for updates
 	baseURL string
 	client  *http.Client
@@ -47,8 +48,10 @@ func NewBinary(binPath string, cfg *config.Config) (*Binary, error) {
 		return nil, err
 	}
 
+	name := filepath.Base(binPath)
 	return &Binary{
-		baseURL: cfg.UpdateBaseURL + "/" + filepath.Base(binPath),
+		Name:    name,
+		baseURL: cfg.UpdateBaseURL + "/" + name,
 		path:    binPath,
 		hash:    h,
 		client: &http.Client{

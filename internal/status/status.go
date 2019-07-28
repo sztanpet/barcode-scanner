@@ -40,9 +40,8 @@ func New(ctx context.Context, bot *telegram.Bot) *Status {
 	}
 }
 
-func (s *Status) Check(filepath string) {
+func (s *Status) Check() {
 	s.sysinfo()
-	s.file(filepath)
 	s.dmesg()
 }
 
@@ -157,15 +156,15 @@ func (s *Status) sysinfo() {
 	}
 }
 
-func (s *Status) file(path string) {
+func (s *Status) CheckFile(path string) {
 	f, err := os.OpenFile(path, os.O_RDWR, 0600)
 	if err != nil {
 		if os.IsNotExist(err) {
 			logger.Tracef("file did not exist, skipping")
 		} else {
 			logger.Warningf("could not open file: %v", err)
-			return
 		}
+		return
 	}
 	defer f.Close()
 

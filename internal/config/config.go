@@ -15,6 +15,7 @@ type Config struct {
 	DatabaseDSN       string
 	TelegramToken     string
 	TelegramChannelID int64
+	Currier           string
 }
 
 func Get() *Config {
@@ -54,11 +55,18 @@ func Get() *Config {
 		os.Exit(1)
 	}
 
+	CurrierService := os.Getenv("CURRIER_SERVICE")
+	if CurrierService == "" {
+		logger.Criticalf("Empty CURRIER_SERVICE env var!")
+		os.Exit(1)
+	}
+
 	return &Config{
 		StatePath:         StatePath,
 		UpdateBaseURL:     UpdateBaseURL,
 		DatabaseDSN:       DatabaseDSN,
 		TelegramToken:     TelegramToken,
 		TelegramChannelID: TelegramChannelID,
+		Currier:           CurrierService,
 	}
 }

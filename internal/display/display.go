@@ -23,7 +23,7 @@ import (
 var logger = loggo.GetLogger("main.display")
 
 // The ScreenTimeout duration after which the display is blanked to prevent burn-in.
-var ScreenTimeout = 10 * time.Minute
+var ScreenTimeout = 1 * time.Hour
 
 // lineCount defines how many lines of text fit on the screen
 const lineCount = 4
@@ -81,12 +81,16 @@ func NewScreen(ctx context.Context) (*Screen, error) {
 
 	img := image1bit.NewVerticalLSB(dev.Bounds())
 
-	return &Screen{
-		ctx:   ctx,
-		dev:   dev,
-		img:   img,
-		lines: make([]string, lineCount),
-	}, nil
+	ret := &Screen{
+		ctx:        ctx,
+		dev:        dev,
+		img:        img,
+		lines:      make([]string, lineCount),
+		lastActive: time.Now(),
+	}
+	_ = ret.Clear()
+
+	return ret, nil
 }
 
 // Lines returns the currently displayed lines of text on the screen
@@ -200,29 +204,13 @@ func (s *Screen) MarkActivity() {
 	defer s.mu.Unlock()
 
 	s.lastActive = time.Now()
+	_ = s.drawUnlocked()
 }
 
-func (s *Screen) shouldBlank() bool {
+func (s *Screen) ShouldBlank() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	blankAfter := s.lastActive.Add(ScreenTimeout)
 	return time.Now().After(blankAfter)
-}
-
-// HandleScreenSaver blanks the screen after ScreenTimeout idle duration
-func (s *Screen) HandleScreenSaver() {
-	t := time.NewTicker(1 * time.Minute)
-	for {
-		select {
-		case <-s.ctx.Done():
-			return
-		case <-t.C:
-			if s.shouldBlank() {
-				_ = s.Blank()
-			} else {
-				_ = s.Draw()
-			}
-		}
-	}
 }

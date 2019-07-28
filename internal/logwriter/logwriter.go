@@ -31,18 +31,21 @@ func Setup(bot *telegram.Bot) error {
 
 func (w *writer) Write(e loggo.Entry) {
 	line := w.formatEntry(e)
-	if w.bot != nil {
-		needNotification := e.Level >= loggo.WARNING
-		err := w.bot.Send(line, !needNotification)
-		if err != nil {
-			fmt.Printf("bot send error: %v\n", err)
-		}
-	}
 
 	fmt.Print(e.Timestamp.Format("[2006-01-02 15:04:05] "))
 	fmt.Printf("%v:%v ", e.Filename, e.Line)
 	fmt.Print(line)
 	fmt.Print("\n")
+
+	go func() {
+		if w.bot != nil {
+			needNotification := e.Level >= loggo.WARNING
+			err := w.bot.Send(line, !needNotification)
+			if err != nil {
+				fmt.Printf("\nbot send error: %v\n", err)
+			}
+		}
+	}()
 }
 
 func (w *writer) formatEntry(e loggo.Entry) string {
@@ -50,7 +53,7 @@ func (w *writer) formatEntry(e loggo.Entry) string {
 	// indicate the level like T1 for TRACE D2 for debug, etc
 	return fmt.Sprintf(
 		"[%v%v|%v:%v:%v] %v",
-		rune(e.Level.String()[0]),
+		string(e.Level.String()[0]),
 		int(e.Level),
 		e.Module,
 		filepath.Base(e.Filename),

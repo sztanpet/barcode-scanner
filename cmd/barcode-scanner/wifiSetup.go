@@ -1,6 +1,7 @@
 package main
 
 import (
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -19,7 +20,26 @@ func (a *app) enterWifiSetup() {
 	a.state = wifiSetupSSID
 	wifiInfo.ssid = ""
 	wifiInfo.pw = ""
-	// TODO prepare screen
+	a.currentLine.Reset()
+
+	_ = a.screen.Clear()
+	_ = a.screen.WriteTitle("WI-FI SETUP")
+	_ = a.screen.WriteLine(1, "SSID:")
+	_ = a.screen.WriteHelp("Enter SSID name and press enter")
+}
+func (a *app) enterWifiSetupPW() {
+	a.state = wifiSetupPW
+	a.currentLine.Reset()
+	_ = a.screen.WriteLine(1, "Password:")
+	_ = a.screen.WriteLine(2, "")
+	_ = a.screen.WriteHelp("Enter PW and press enter")
+}
+func (a *app) enterWifiSetupDone() {
+	a.state = wifiSetupDone
+	a.currentLine.Reset()
+	_ = a.screen.WriteLine(1, "Checking…")
+	_ = a.screen.WriteLine(2, "")
+	_ = a.screen.WriteHelp("Please wait… (ESC to cancel)")
 }
 
 // handleWifiSetupInput is only called by transitionState
@@ -30,13 +50,25 @@ func (a *app) handleWifiSetupInput(r rune) {
 		switch a.state {
 		case wifiSetupSSID:
 			wifiInfo.ssid = line
+			if len(line) > 0 {
+				a.enterWifiSetupPW()
+			}
+
 		case wifiSetupPW:
 			wifiInfo.pw = line
+			if len(line) > 0 {
+				a.enterWifiSetupDone()
+			}
+
+		case wifiSetupDone:
 			err := wifi.Setup(wifiInfo.ssid, wifiInfo.pw)
 			if err != nil {
-				// TODO display something on screen
+				_ = a.screen.WriteLine(2, "Error!")
 				logger.Criticalf("wifi setup error: %v", err)
+			} else {
+				_ = a.screen.WriteLine(2, "Success!")
 			}
+			time.Sleep(2 * time.Second)
 			a.doneWifiSetup()
 		}
 	case tty.KeyBackspace, tty.KeyDelete:
@@ -52,12 +84,14 @@ func (a *app) handleWifiSetupInput(r rune) {
 				}
 				i += n
 			}
-			// TODO display line again
+
+			_ = a.screen.WriteLine(2, a.currentLine.String())
 			logger.Tracef("handleWifiSetupInput: backspace")
 		}
 	default:
 		if unicode.IsPrint(r) {
 			_, _ = a.currentLine.WriteRune(r)
+			_ = a.screen.WriteLine(2, a.currentLine.String())
 		}
 	}
 }
@@ -67,6 +101,7 @@ func (a *app) cancelWifiSetup() {
 	a.state = readBarcode
 	wifiInfo.ssid = ""
 	wifiInfo.pw = ""
+	a.currentLine.Reset()
 	a.enterReadBarcode()
 }
 
