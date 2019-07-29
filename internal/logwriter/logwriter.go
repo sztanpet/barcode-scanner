@@ -2,8 +2,12 @@ package logwriter
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/config"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/file"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/telegram"
 	"github.com/juju/loggo"
 )
@@ -12,7 +16,18 @@ type writer struct {
 	bot *telegram.Bot
 }
 
-func Setup(bot *telegram.Bot) error {
+var logPath string
+
+func Setup(bot *telegram.Bot, cfg *config.Config) error {
+	if path, err := os.Executable(); err != nil {
+		panic("os.Executable() failed! " + err.Error())
+	} else {
+		logPath = filepath.Join(
+			cfg.StatePath,
+			filepath.Base(path)+".log",
+		)
+	}
+
 	_, err := loggo.RemoveWriter("default")
 	if err != nil {
 		return err
@@ -32,17 +47,27 @@ func Setup(bot *telegram.Bot) error {
 func (w *writer) Write(e loggo.Entry) {
 	line := w.formatEntry(e)
 
-	fmt.Print(e.Timestamp.Format("[2006-01-02 15:04:05] "))
-	fmt.Printf("%v:%v ", e.Filename, e.Line)
-	fmt.Print(line)
-	fmt.Print("\n")
+	fp := e.Filename
+	ix := strings.Index(e.Filename, "barcode-scanner/")
+	if ix != -1 {
+		fp = fp[ix+len("barcode-scanner/"):]
+	}
+
+	l := fmt.Sprintf("%v%v:%v %v\n",
+		e.Timestamp.Format("[2006-01-02 15:04:05] "),
+		fp, e.Line,
+		line,
+	)
+	if err := file.Append(logPath, []byte(l)); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write log file: %v\n", err)
+	}
 
 	go func() {
 		if w.bot != nil {
 			needNotification := e.Level >= loggo.WARNING
 			err := w.bot.Send(line, !needNotification)
 			if err != nil {
-				fmt.Printf("\nbot send error: %v\n", err)
+				fmt.Fprintf(os.Stderr, "%v bot send error: %v\n", e.Timestamp.Format("[2006-01-02 15:04:05]"), err)
 			}
 		}
 	}()

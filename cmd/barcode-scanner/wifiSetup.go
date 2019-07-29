@@ -22,24 +22,26 @@ func (a *app) enterWifiSetup() {
 	wifiInfo.pw = ""
 	a.currentLine.Reset()
 
-	_ = a.screen.Clear()
-	_ = a.screen.WriteTitle("WI-FI SETUP")
-	_ = a.screen.WriteLine(1, "SSID:")
-	_ = a.screen.WriteHelp("Enter SSID name and press enter")
+	a.screen.Clear()
+	a.screen.WriteTitle("WI-FI SETUP")
+	a.screen.WriteLine(1, "SSID:")
+	a.screen.WriteHelp("Enter SSID name and press enter")
 }
 func (a *app) enterWifiSetupPW() {
 	a.state = wifiSetupPW
 	a.currentLine.Reset()
-	_ = a.screen.WriteLine(1, "Password:")
-	_ = a.screen.WriteLine(2, "")
-	_ = a.screen.WriteHelp("Enter PW and press enter")
+
+	a.screen.WriteLine(1, "Password:")
+	a.screen.WriteLine(2, "")
+	a.screen.WriteHelp("Enter PW and press enter")
 }
 func (a *app) enterWifiSetupDone() {
 	a.state = wifiSetupDone
 	a.currentLine.Reset()
-	_ = a.screen.WriteLine(1, "Checking…")
-	_ = a.screen.WriteLine(2, "")
-	_ = a.screen.WriteHelp("Please wait… (ESC to cancel)")
+
+	a.screen.WriteLine(1, "Checking…")
+	a.screen.WriteLine(2, "")
+	a.screen.WriteHelp("Please wait… (ESC to cancel)")
 }
 
 // handleWifiSetupInput is only called by transitionState
@@ -63,10 +65,10 @@ func (a *app) handleWifiSetupInput(r rune) {
 		case wifiSetupDone:
 			err := wifi.Setup(wifiInfo.ssid, wifiInfo.pw)
 			if err != nil {
-				_ = a.screen.WriteLine(2, "Error!")
+				a.screen.WriteLine(2, "Error!")
 				logger.Criticalf("wifi setup error: %v", err)
 			} else {
-				_ = a.screen.WriteLine(2, "Success!")
+				a.screen.WriteLine(2, "Success!")
 			}
 			time.Sleep(2 * time.Second)
 			a.doneWifiSetup()
@@ -85,13 +87,13 @@ func (a *app) handleWifiSetupInput(r rune) {
 				i += n
 			}
 
-			_ = a.screen.WriteLine(2, a.currentLine.String())
+			a.screen.WriteLine(2, a.currentLine.String())
 			logger.Tracef("handleWifiSetupInput: backspace")
 		}
 	default:
 		if unicode.IsPrint(r) {
 			_, _ = a.currentLine.WriteRune(r)
-			_ = a.screen.WriteLine(2, a.currentLine.String())
+			a.screen.WriteLine(2, a.currentLine.String())
 		}
 	}
 }

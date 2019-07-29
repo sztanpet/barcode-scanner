@@ -1,5 +1,6 @@
 // +build !windows
 // +build !plan9
+// +build !amd64
 
 // status implements monitoring of system status
 // checks for new dmesg output and logs it

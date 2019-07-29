@@ -121,3 +121,21 @@ func CopyOver(src, dest string) error {
 
 	return WriteAtomically(dest, sf)
 }
+
+func Append(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err := f.Write(data); err != nil {
+		return err
+	}
+
+	if err := f.Sync(); err != nil {
+		return err
+	}
+
+	return nil
+}

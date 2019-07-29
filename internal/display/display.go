@@ -1,3 +1,5 @@
+// +build !amd64
+
 package display
 
 import (
@@ -88,7 +90,7 @@ func NewScreen(ctx context.Context) (*Screen, error) {
 		lines:      make([]string, lineCount),
 		lastActive: time.Now(),
 	}
-	_ = ret.Clear()
+	ret.Clear()
 
 	return ret, nil
 }
@@ -132,70 +134,74 @@ func (s *Screen) writeUnlocked(f font.Face, line int, c color.Color, centered bo
 	}
 
 	// add 2 pixels to the height because it looks better that way
-	r := image.Rect(bounds.Min.X.Round(), bounds.Min.Y.Round(), s.img.Bounds().Dx(), height+2)
+	r := image.Rect(bounds.Min.X.Round(), bounds.Min.Y.Round(), s.img.Bounds().Dx(), height+1)
 	draw.Draw(s.img, r, &image.Uniform{bg}, image.ZP, draw.Src)
 
 	drawer.DrawString(text)
 }
 
 // WriteTitle draws the text in black on a white background into the first line (line #0)
-func (s *Screen) WriteTitle(text string) error {
+func (s *Screen) WriteTitle(text string) {
 	s.MarkActivity()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lines[0] = text
 
 	s.writeUnlocked(titleFont, 0, black, true, text)
-	return s.drawUnlocked()
+	s.drawUnlocked()
 }
 
 // WriteLine writes the text in white on black into the indicated line (usually #1 or #2)
-func (s *Screen) WriteLine(line int, text string) error {
+func (s *Screen) WriteLine(line int, text string) {
 	s.MarkActivity()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lines[line] = text
 
 	s.writeUnlocked(mediumFont, line, white, false, text)
-	return s.drawUnlocked()
+	s.drawUnlocked()
 }
 
 // WriteHelp writes help text in black on white into the last line (line #3)
-func (s *Screen) WriteHelp(text string) error {
+func (s *Screen) WriteHelp(text string) {
 	s.MarkActivity()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.lines[lineCount-1] = text
 	s.writeUnlocked(helpFont, lineCount-1, black, true, text)
-	return s.drawUnlocked()
+	s.drawUnlocked()
 }
 
 // Clear clears the image
-func (s *Screen) Clear() error {
+func (s *Screen) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.img = image1bit.NewVerticalLSB(s.dev.Bounds())
-	return s.drawUnlocked()
+	s.drawUnlocked()
 }
 
 // Draw display the image
-func (s *Screen) Draw() error {
+func (s *Screen) Draw() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.drawUnlocked()
+	s.drawUnlocked()
 }
 
-func (s *Screen) drawUnlocked() error {
-	return s.dev.Draw(s.dev.Bounds(), s.img, image.Point{})
+func (s *Screen) drawUnlocked() {
+	if err := s.dev.Draw(s.dev.Bounds(), s.img, image.Point{}); err != nil {
+		logger.Errorf("draw error: %v", err)
+	}
 }
 
 // Blank blanks the screen without clearing the image
-func (s *Screen) Blank() error {
+func (s *Screen) Blank() {
 	s.MarkActivity()
-	return s.dev.Halt()
+	if err := s.dev.Halt(); err != nil {
+		logger.Errorf("halt error: %v", err)
+	}
 }
 
 // MarkActivity explicitly cancels the screen-saver (most anything else implicitly does it)
@@ -204,7 +210,7 @@ func (s *Screen) MarkActivity() {
 	defer s.mu.Unlock()
 
 	s.lastActive = time.Now()
-	_ = s.drawUnlocked()
+	s.drawUnlocked()
 }
 
 func (s *Screen) ShouldBlank() bool {

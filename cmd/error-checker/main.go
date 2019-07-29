@@ -13,10 +13,18 @@ func main() {
 	ctx, exit := context.WithCancel(context.Background())
 	bot := telegram.New(ctx, cfg)
 
-	err := logwriter.Setup(bot)
+	err := logwriter.Setup(bot, cfg)
 	if err != nil {
 		panic("logwriter setup failed, impossible")
 	}
+
+	/*
+		TODO send logs
+		logPath = filepath.Join(
+			cfg.StatePath,
+			"barcode-scanner.log",
+		)
+	*/
 
 	// https://www.freedesktop.org/software/systemd/man/systemd.exec.html#%24EXIT_CODE
 	// $EXIT_CODE is one of "exited", "killed", "dumped"

@@ -21,7 +21,7 @@ type Bot struct {
 	channelID int64
 	limiter   *rate.Limiter
 
-	mu  sync.Mutex
+	mu  sync.RWMutex
 	api *tgbotapi.BotAPI
 }
 
@@ -43,13 +43,15 @@ func New(ctx context.Context, cfg *config.Config) *Bot {
 }
 
 func (t *Bot) ensureAPI() (err error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
+	t.mu.RLock()
 	if t.api != nil {
+		t.mu.RUnlock()
 		return nil
 	}
+	t.mu.RUnlock()
 
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.api, err = tgbotapi.NewBotAPI(t.token)
 	return
 }
@@ -137,12 +139,13 @@ func (t *Bot) HandleMessage(callback func(msg string), onlyNewUpdates bool) erro
 	if err != nil {
 		return err
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
 
+	t.mu.Lock()
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates, err := t.api.GetUpdatesChan(u)
+	t.mu.Unlock()
+
 	if err != nil {
 		return err
 	}

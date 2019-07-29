@@ -1,3 +1,5 @@
+// +build !amd64
+
 // buzzer uses the linux pwm driver to generate tones for a piezzo buzzer
 // more info: blog.oddbit.com/post/2017-09-26-some-notes-on-pwm-on-the-raspberry-pi
 package buzzer

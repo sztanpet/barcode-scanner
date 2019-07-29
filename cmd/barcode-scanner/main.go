@@ -3,20 +3,17 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"code.sztanpet.net/zvpsz/barcode-scanner/internal/buzzer"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/config"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/display"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/file"
-	"code.sztanpet.net/zvpsz/barcode-scanner/internal/logwriter"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/status"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/storage"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/telegram"
@@ -28,13 +25,22 @@ import (
 type direction int
 
 func (d *direction) String() string {
-	return strconv.Itoa(int(*d))
+	switch *d {
+	case 0:
+		return "EGRESS"
+	case 1:
+		return "INGRESS"
+	}
+
+	panic("unknown value for direction: " + strconv.Itoa(int(*d)))
 }
 
 const (
 	EGRESS  direction = 0
 	INGRESS direction = 1
 )
+
+var specialBarcodeRe = regexp.MustCompile(`(?i)^(INGRESS|EGRESS)-(\d+)$`)
 
 // TODO https://vincent.bernat.ch/en/blog/2017-systemd-golang
 // TODO reverter binary
@@ -66,12 +72,15 @@ var (
 )
 
 func main() {
+	logger.SetLogLevel(loggo.TRACE)
+
 	cfg := config.Get()
 	ctx, exit := context.WithCancel(context.Background())
 	a := &app{
-		ctx:  ctx,
-		exit: exit,
-		cfg:  cfg,
+		ctx:     ctx,
+		exit:    exit,
+		cfg:     cfg,
+		currier: "0",
 	}
 
 	// handle signals first
@@ -103,90 +112,6 @@ func main() {
 	os.Exit(0)
 }
 
-func (a *app) handleSignals() {
-	if a.ctx.Err() != nil {
-		return
-	}
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c)
-	go func() {
-		s := <-c
-		// exit unconditionally on any signal
-		logger.Warningf("Got signal: %s, exiting cleanly", s)
-		a.exit()
-		fmt.Println("exited")
-	}()
-}
-
-func (a *app) setupLogging() {
-	if a.ctx.Err() != nil {
-		return
-	}
-
-	err := logwriter.Setup(a.bot)
-	if err != nil {
-		panic("logwriter setup failed, impossible: " + err.Error())
-	}
-}
-
-func (a *app) setupUpdate() {
-	if a.ctx.Err() != nil {
-		return
-	}
-
-	binPath, err := os.Executable()
-	if err != nil {
-		logger.Criticalf("os.Executable failed: %v", err)
-		panic("os.Executable failed: " + err.Error())
-	}
-	upd, err := update.NewBinary(binPath, a.cfg)
-	if err != nil {
-		logger.Criticalf("update.NewBinary failed: %v", err)
-		panic("update.NewBinary failed: " + err.Error())
-	}
-	a.upd = upd
-
-	a.addIdleTask(func() {
-		if a.upd.ShouldRestart() {
-			logger.Warningf("update available, exiting cleanly")
-			a.exit()
-		}
-	})
-}
-
-func (a *app) setupStorage() {
-	if a.ctx.Err() != nil {
-		return
-	}
-
-	storage, err := storage.New(a.ctx, a.cfg)
-	if err != nil {
-		logger.Criticalf("failed to initialize storage: %v", err)
-		os.Exit(1)
-	}
-
-	a.storage = storage
-}
-
-func (a *app) setupTelegram() {
-	if a.ctx.Err() != nil {
-		return
-	}
-
-	a.bot = telegram.New(a.ctx, a.cfg)
-	_ = a.bot.Send("BS-start @ "+time.Now().Format(time.RFC3339), true)
-
-	// TODO make telegram persist unsendable messages and retry automatically?
-	go func() {
-		err := a.bot.HandleMessage(handleTelegramMessage, false)
-
-		if err != nil {
-			logger.Criticalf("Handlemessage error: %v", err)
-		}
-	}()
-}
-
 // the bot can receive messages, so lets control the logging levels with it
 // the command message has to begin with the following prefix
 // and the rest is the logging specification as documented at
@@ -195,7 +120,14 @@ func (a *app) setupTelegram() {
 // ex: <root>=ERROR; foo.bar=WARNING
 // full command would thus be:
 // !log barcode-scanner <root>=ERROR; foo.bar=WARNING
-func handleTelegramMessage(msg string) {
+func (a *app) handleTelegramMessage(msg string) {
+	if msg == "!restart barcode-scanner" {
+		logger.Warningf("restarting due to command")
+		time.Sleep(500 * time.Millisecond)
+		a.exit()
+		return
+	}
+
 	const pfx = "!log barcode-scanner "
 	if len(msg) < len(pfx) || !strings.EqualFold(msg[:len(pfx)], pfx) {
 		return
@@ -213,45 +145,6 @@ func handleTelegramMessage(msg string) {
 	}
 
 	logger.Debugf("logging spec successfully applied, spec was: %v", spec)
-}
-
-func (a *app) setupScreen() {
-	if a.ctx.Err() != nil {
-		return
-	}
-
-	screen, err := display.NewScreen(a.ctx)
-	if err != nil {
-		// screen handles its own logging, just exit
-		fmt.Printf("screen err: %v", err)
-		a.exit()
-		return
-	}
-	a.screen = screen
-
-	_ = a.screen.WriteTitle("STARTUP")
-	_ = a.screen.WriteLine(1, "")
-	_ = a.screen.WriteLine(2, "OK")
-	_ = a.screen.WriteHelp("Scanner ready")
-
-	a.addIdleTask(func() {
-		if err := a.screen.Blank(); err != nil {
-			logger.Warningf("Failed to blank screen on idle, error was: %v", err)
-		}
-	})
-}
-
-func (a *app) setupBuzzer() {
-	if a.ctx.Err() != nil {
-		return
-	}
-
-	if err := buzzer.Setup(); err != nil {
-		logger.Warningf("buzzer setup error: %v", err)
-	}
-	if err := buzzer.StartupBeep(); err != nil {
-		logger.Warningf("buzzer beep error: %v", err)
-	}
 }
 
 func (a *app) inputLoop() {
@@ -328,7 +221,7 @@ func (a *app) addIdleTask(f func()) {
 	a.idleTasks = append(a.idleTasks, f)
 }
 
-func (a *app) persistSettings() {
+func (a *app) persistSettingsLocked() {
 	s := &struct {
 		Direction int
 		Currier   string
@@ -345,14 +238,8 @@ func (a *app) persistSettings() {
 	}
 }
 
-func (a *app) setupSettings() {
-	a.loadSettings()
-	a.addIdleTask(func() {
-		if !a.idleStart.IsZero() && time.Now().After(a.idleStart.Add(6*time.Hour)) {
-			a.dir = 0
-			a.currier = a.cfg.Currier
-		}
-	})
+func (a *app) inExtendedIdle() bool {
+	return !a.idleStart.IsZero() && time.Now().After(a.idleStart.Add(6*time.Hour))
 }
 
 func (a *app) loadSettings() {
@@ -371,6 +258,14 @@ func (a *app) loadSettings() {
 	if err := file.Unserialize(path, s); err != nil {
 		logger.Warningf("Failed to unserialize settings: %v", err)
 	}
+
+	if !a.inExtendedIdle() {
+		logger.Debugf("Settings too old, not restoring: %#v", s)
+		return
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
 	a.dir = direction(s.Direction)
 	a.currier = s.Currier

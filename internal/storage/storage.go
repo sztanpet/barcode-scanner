@@ -48,6 +48,10 @@ type Barcode struct {
 var logger = loggo.GetLogger("main.storage")
 var pathProcessDurr = 1 * time.Minute
 
+func init() {
+	logger.SetLogLevel(loggo.TRACE)
+}
+
 // TODO mysql: use ssl connections only, SET GLOBAL require_secure_transport ON
 // dsn options: ?loc=UTC&parseTime=true&strict=true&timeout=1s&time_zone="+00:00"
 
@@ -107,7 +111,9 @@ func (s *Storage) Insert(data Barcode) {
 	// persist data to disk first
 	// assumption: UnixNano() will give us a safely unique and nicely sortable filename
 	dp := s.pathForBarcode(data)
-	_ = file.Serialize(dp, &data)
+	if err := file.Serialize(dp, &data); err != nil {
+		logger.Errorf("serialize failed: %v", err)
+	}
 
 	// insert the data into an in-memory buffer of Barcodes too, to protect against the case where:
 	// - persisting fails and inserting fails
@@ -122,7 +128,6 @@ func (s *Storage) Insert(data Barcode) {
 	}
 	s.inBuf[ix] = data
 	s.bufMu.Unlock()
-	logger.Infof("Insert: sending on storage.insert would have blocked, message buffered")
 
 	// try to send the data up to the DB asap, on success the serialized file will be deleted
 	select {
@@ -130,6 +135,7 @@ func (s *Storage) Insert(data Barcode) {
 		// was the context already cancelled?
 	case s.insert <- inData{path: dp, data: data}:
 	default:
+		logger.Tracef("select would have blocked")
 	}
 }
 
@@ -169,9 +175,12 @@ func (s *Storage) consumeData() {
 				ix := sha1.Sum([]byte(in.path))
 				delete(s.inBuf, ix)
 				s.bufMu.Unlock()
-			}
-			// otherwise just ignore the error, processPath and processBuf will retry the insert later
 
+				logger.Tracef("inserted barcode: %v", in.path)
+			} else {
+				// otherwise just ignore the error, processPath and processBuf will retry the insert later
+				logger.Debugf("dbInsert error: %v", err)
+			}
 		case <-t.C:
 			if cancel != nil {
 				cancel()
@@ -309,7 +318,6 @@ func (s *Storage) ensureStatement() error {
 		VALUES (?, ?, ?, ?, NOW())
 	`)
 	if err != nil {
-		_ = s.db.Close()
 		return err
 	}
 	s.inStmt = stmt
