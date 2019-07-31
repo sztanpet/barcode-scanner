@@ -55,9 +55,10 @@ func (s *Status) dmesg() {
 	}
 
 	if len(out) == 0 {
-		logger.Tracef("dmesg output was empty")
 		return
 	}
+
+	logger.Tracef("handling dmesg output")
 
 	// zip it
 	filename := time.Now().Format("20060102_150405") + "_dmesg.txt"

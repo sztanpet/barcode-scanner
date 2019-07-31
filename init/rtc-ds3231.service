@@ -1,0 +1,12 @@
+[Unit]
+Description=Initialize i2c-rtc device ds3231
+DefaultDependencies=no
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "echo ds3231 0x68 > /sys/class/i2c-adapter/i2c-0/new_device"
+
+[Install]
+WantedBy=basic.target

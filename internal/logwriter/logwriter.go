@@ -65,10 +65,8 @@ func (w *writer) Write(e loggo.Entry) {
 	go func() {
 		if w.bot != nil {
 			needNotification := e.Level >= loggo.WARNING
-			err := w.bot.Send(line, !needNotification)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v bot send error: %v\n", e.Timestamp.Format("[2006-01-02 15:04:05]"), err)
-			}
+			// ignore error, already logging to a file
+			_ = w.bot.Send(line, !needNotification)
 		}
 	}()
 }

@@ -1,0 +1,6 @@
+[Unit]
+Description=Synchronize system clock from RTC
+
+[Service]
+ExecStart=/sbin/hwclock --hctosys --utc -f /dev/rtc1
+Type=oneshot

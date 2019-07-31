@@ -27,7 +27,6 @@ func (a *app) handleSignals() {
 		// exit unconditionally on any signal
 		logger.Warningf("Got signal: %s, exiting cleanly", s)
 		a.exit()
-		fmt.Println("exited")
 	}()
 }
 
@@ -35,12 +34,11 @@ func (a *app) setupLogging() {
 	if a.ctx.Err() != nil {
 		return
 	}
-	logger.Tracef("setupLogging start")
+
 	err := logwriter.Setup(a.bot, a.cfg)
 	if err != nil {
 		panic("logwriter setup failed, impossible: " + err.Error())
 	}
-	logger.Tracef("setupLogging end")
 }
 
 func (a *app) setupUpdate() {
@@ -48,7 +46,6 @@ func (a *app) setupUpdate() {
 		return
 	}
 
-	logger.Tracef("setupUpdate start")
 	binPath, err := os.Executable()
 	if err != nil {
 		logger.Criticalf("os.Executable failed: %v", err)
@@ -67,14 +64,13 @@ func (a *app) setupUpdate() {
 			a.exit()
 		}
 	})
-	logger.Tracef("setupUpdate end")
 }
 
 func (a *app) setupStorage() {
 	if a.ctx.Err() != nil {
 		return
 	}
-	logger.Tracef("setupStorage start")
+
 	storage, err := storage.New(a.ctx, a.cfg)
 	if err != nil {
 		logger.Criticalf("failed to initialize storage: %v", err)
@@ -82,19 +78,16 @@ func (a *app) setupStorage() {
 	}
 
 	a.storage = storage
-	logger.Tracef("setupStorage end")
 }
 
 func (a *app) setupTelegram() {
 	if a.ctx.Err() != nil {
 		return
 	}
-	logger.Tracef("setupTelegram start")
 
 	a.bot = telegram.New(a.ctx, a.cfg)
 	_ = a.bot.Send("BS-start @ "+time.Now().Format(time.RFC3339), true)
 
-	// TODO make telegram persist unsendable messages and retry automatically?
 	go func() {
 		err := a.bot.HandleMessage(a.handleTelegramMessage, false)
 
@@ -102,14 +95,13 @@ func (a *app) setupTelegram() {
 			logger.Criticalf("Handlemessage error: %v", err)
 		}
 	}()
-	logger.Tracef("setupTelegram end")
 }
 
 func (a *app) setupScreen() {
 	if a.ctx.Err() != nil {
 		return
 	}
-	logger.Tracef("setupScreen start")
+
 	screen, err := display.NewScreen(a.ctx)
 	if err != nil {
 		// screen handles its own logging, just exit
@@ -127,8 +119,6 @@ func (a *app) setupScreen() {
 	a.addIdleTask(func() {
 		a.screen.Blank()
 	})
-
-	logger.Tracef("setupScreen end")
 }
 
 func (a *app) setupBuzzer() {
@@ -136,18 +126,15 @@ func (a *app) setupBuzzer() {
 		return
 	}
 
-	logger.Tracef("setupBuzzer start")
 	if err := buzzer.Setup(); err != nil {
 		logger.Warningf("buzzer setup error: %v", err)
 	}
 	if err := buzzer.StartupBeep(); err != nil {
 		logger.Warningf("buzzer beep error: %v", err)
 	}
-	logger.Tracef("setupBuzzer end")
 }
 
 func (a *app) setupSettings() {
-	logger.Tracef("setupSettings start")
 	a.loadSettings()
 	a.addIdleTask(func() {
 		if a.inExtendedIdle() {
@@ -155,5 +142,4 @@ func (a *app) setupSettings() {
 			a.currier = "0"
 		}
 	})
-	logger.Tracef("setupSettings end")
 }

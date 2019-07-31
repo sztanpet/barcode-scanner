@@ -48,10 +48,6 @@ type Barcode struct {
 var logger = loggo.GetLogger("main.storage")
 var pathProcessDurr = 1 * time.Minute
 
-func init() {
-	logger.SetLogLevel(loggo.TRACE)
-}
-
 // TODO mysql: use ssl connections only, SET GLOBAL require_secure_transport ON
 // dsn options: ?loc=UTC&parseTime=true&strict=true&timeout=1s&time_zone="+00:00"
 
@@ -236,7 +232,10 @@ func (s *Storage) processPath(ctx context.Context) {
 		return
 	}
 
-	logger.Tracef("number of files to insert: %v", len(files))
+	if len(files) > 0 {
+		logger.Tracef("number of files to insert: %v", len(files))
+	}
+
 	for _, f := range files {
 		id := inData{
 			path: filepath.Join(s.path, f.Name()),

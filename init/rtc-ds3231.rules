@@ -1,0 +1,1 @@
+KERNEL=="rtc1", SUBSYSTEM=="rtc", SUBSYSTEMS=="i2c", TAG+="systemd", ENV{SYSTEMD_WANTS}="rtc-ds3231-sync.service"

@@ -71,9 +71,11 @@ var (
 	statusDurr = 5 * time.Minute
 )
 
-func main() {
-	logger.SetLogLevel(loggo.TRACE)
+func init() {
+	loggo.GetLogger("").SetLogLevel(loggo.TRACE)
+}
 
+func main() {
 	cfg := config.Get()
 	ctx, exit := context.WithCancel(context.Background())
 	a := &app{
@@ -139,12 +141,13 @@ func (a *app) handleTelegramMessage(msg string) {
 		return
 	}
 
+	loggo.DefaultContext().ResetLoggerLevels()
 	if err := loggo.ConfigureLoggers(spec); err != nil {
 		logger.Errorf("failed to apply log spec: %v, error was: %v", spec, err)
 		return
 	}
 
-	logger.Debugf("logging spec successfully applied, spec was: %v", spec)
+	logger.Debugf("logging spec successfully applied after reset, spec was: %v", spec)
 }
 
 func (a *app) inputLoop() {
