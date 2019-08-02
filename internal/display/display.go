@@ -198,7 +198,7 @@ func (s *Screen) drawUnlocked() {
 
 // Blank blanks the screen without clearing the image
 func (s *Screen) Blank() {
-	s.MarkActivity()
+	logger.Tracef("blanking screen")
 	if err := s.dev.Halt(); err != nil {
 		logger.Errorf("halt error: %v", err)
 	}
@@ -208,6 +208,10 @@ func (s *Screen) Blank() {
 func (s *Screen) MarkActivity() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if time.Now().Sub(s.lastActive) > 1*time.Hour {
+		logger.Tracef("activity after more than an hour")
+	}
 
 	s.lastActive = time.Now()
 	s.drawUnlocked()

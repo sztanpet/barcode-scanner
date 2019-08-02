@@ -163,7 +163,16 @@ func (s *Storage) consumeData() {
 					// not doing anything more than logging the error will not cause trouble
 					// since there is a unique index on barcode.createdat, so on re-inserting
 					// we should just try and remove the file again
-					logger.Errorf("Failed to remove path: %v error was: %v", in.path, err)
+					//
+					// the same data can be sent multiple times because:
+					//  - new barcode, gets persisted, gets buffered, tries to be inserted BUT
+					//    there is no internet, insertion failes, the data remains persisted and buffered
+					//  - internet comes back
+					//  - buffer handling runs, inserts data, removes persisted file
+					//  - persisted file handling runs at near the same time, reads persisted data
+					//    inserts (but unique index ignores it)
+					//    tries to remove persisted file, but buffer handling already removed it
+					logger.Debugf("Failed to remove path: %v error was: %v", in.path, err)
 				}
 
 				// delete from in-memory buffer of barcodes

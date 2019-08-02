@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/juju/loggo"
@@ -30,6 +31,11 @@ func Setup(ssid, pw string) error {
 	sc := bufio.NewScanner(buf)
 	for sc.Scan() {
 		name := sc.Text()
+		if strings.Contains(name, "Wired") {
+			logger.Tracef("not deleting wired connection: %v", name)
+			continue
+		}
+
 		logger.Debugf("deleting connection: %v", name)
 
 		// nmcli con delete <name>

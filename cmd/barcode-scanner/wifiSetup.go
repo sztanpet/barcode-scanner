@@ -25,7 +25,8 @@ func (a *app) enterWifiSetup() {
 	a.screen.Clear()
 	a.screen.WriteTitle("WI-FI SETUP")
 	a.screen.WriteLine(1, "SSID:")
-	a.screen.WriteHelp("Enter SSID name and press enter")
+	a.screen.WriteLine(2, "")
+	a.screen.WriteHelp("(ESC to cancel)")
 }
 func (a *app) enterWifiSetupPW() {
 	a.state = wifiSetupPW
@@ -33,21 +34,45 @@ func (a *app) enterWifiSetupPW() {
 
 	a.screen.WriteLine(1, "Password:")
 	a.screen.WriteLine(2, "")
-	a.screen.WriteHelp("Enter PW and press enter")
+	a.screen.WriteHelp("(ESC to cancel)")
 }
 func (a *app) enterWifiSetupDone() {
 	a.state = wifiSetupDone
 	a.currentLine.Reset()
 
 	a.screen.WriteLine(1, "Checking…")
-	a.screen.WriteLine(2, "")
-	a.screen.WriteHelp("Please wait… (ESC to cancel)")
+	a.screen.WriteLine(2, "Please wait…")
+	a.screen.WriteHelp("")
+
+	err := wifi.Setup(wifiInfo.ssid, wifiInfo.pw)
+	if err != nil {
+		a.screen.WriteLine(2, "Error!")
+		logger.Criticalf("wifi setup error: %v", err)
+	} else {
+		a.screen.WriteLine(2, "Success!")
+	}
+	time.Sleep(2 * time.Second)
+	a.doneWifiSetup()
+}
+
+// cancelWifiSetup is only called by transitionState
+func (a *app) cancelWifiSetup() {
+	a.state = readBarcode
+	wifiInfo.ssid = ""
+	wifiInfo.pw = ""
+	a.currentLine.Reset()
+	a.enterReadBarcode()
+}
+
+func (a *app) doneWifiSetup() {
+	logger.Debugf("handleWifiSetupInput: doneWifiSetup -> readBarcode")
+	a.cancelWifiSetup()
 }
 
 // handleWifiSetupInput is only called by transitionState
 func (a *app) handleWifiSetupInput(r rune) {
 	switch r {
-	case '\r':
+	case '\n':
 		line := a.currentLine.String()
 		switch a.state {
 		case wifiSetupSSID:
@@ -63,16 +88,15 @@ func (a *app) handleWifiSetupInput(r rune) {
 			}
 
 		case wifiSetupDone:
-			err := wifi.Setup(wifiInfo.ssid, wifiInfo.pw)
-			if err != nil {
-				a.screen.WriteLine(2, "Error!")
-				logger.Criticalf("wifi setup error: %v", err)
-			} else {
-				a.screen.WriteLine(2, "Success!")
-			}
-			time.Sleep(2 * time.Second)
-			a.doneWifiSetup()
+			// nothing to do
+		default:
+			panic("unhandled state " + string(rune(a.state+'0')))
 		}
+
+	case tty.KeyEscape:
+		logger.Debugf("handleWifiSetupInput: escape pressed; state was: %v", a.state)
+		a.cancelWifiSetup()
+
 	case tty.KeyBackspace, tty.KeyDelete:
 		// https://stackoverflow.com/questions/39907667/how-to-remove-unicode-characters-from-byte-buffer-in-go
 		if a.currentLine.Len() >= 1 {
@@ -96,19 +120,4 @@ func (a *app) handleWifiSetupInput(r rune) {
 			a.screen.WriteLine(2, a.currentLine.String())
 		}
 	}
-}
-
-// cancelWifiSetup is only called by transitionState
-func (a *app) cancelWifiSetup() {
-	a.state = readBarcode
-	wifiInfo.ssid = ""
-	wifiInfo.pw = ""
-	a.currentLine.Reset()
-	a.enterReadBarcode()
-}
-
-// doneWifiSetup is called by handleWifiSetupInput (NOT transitionState)
-func (a *app) doneWifiSetup() {
-	logger.Debugf("State: wifiSetup -> readBarcode (doneWifiSetup)")
-	a.cancelWifiSetup()
 }
