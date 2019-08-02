@@ -25,6 +25,17 @@ type Bot struct {
 	api *tgbotapi.BotAPI
 }
 
+type nullLogger struct{}
+
+func (nullLogger) Println(v ...interface{})               {}
+func (nullLogger) Printf(format string, v ...interface{}) {}
+func init() {
+	// when there is no internet, telegram will log to stderr
+	// that's useless since it signals the error via return values anyway
+	// disable it
+	_ = tgbotapi.SetLogger(nullLogger{})
+}
+
 func New(ctx context.Context, cfg *config.Config) *Bot {
 	api, err := tgbotapi.NewBotAPI(cfg.TelegramToken)
 	if err != nil {
