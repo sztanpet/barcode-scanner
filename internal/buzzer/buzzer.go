@@ -100,10 +100,12 @@ func checkLastBeep() {
 
 		running.Lock()
 		if !exported {
+			running.Unlock()
 			continue
 		}
 
 		if lastBeep.Add(5 * time.Minute).After(now) {
+			running.Unlock()
 			continue
 		}
 
