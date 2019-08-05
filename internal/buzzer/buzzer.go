@@ -121,7 +121,7 @@ func checkLastBeep() {
 // The problem can be sidestepped by momentarily switching the output on.
 func deNoise() {
 	enable()
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(2 * time.Millisecond)
 	disable()
 	markLastBeep()
 }
