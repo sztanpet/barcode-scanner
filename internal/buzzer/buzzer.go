@@ -120,9 +120,18 @@ func checkLastBeep() {
 // pwm output becomes so big. This causes the components to heat up unnecessarily.
 // The problem can be sidestepped by momentarily switching the output on.
 func deNoise() {
-	enable()
-	time.Sleep(2 * time.Millisecond)
-	disable()
+	if !exported {
+		return
+	}
+
+	if err := write(pwmBase+port+"/polarity", "inversed"); err != nil {
+		unexport()
+		return
+	}
+	time.Sleep(10 * time.Millisecond)
+	if err := write(pwmBase+port+"/polarity", "normal"); err != nil {
+		unexport()
+	}
 	markLastBeep()
 }
 
