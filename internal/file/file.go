@@ -112,6 +112,14 @@ func Exists(path string) bool {
 	return err == nil
 }
 
+func Empty(path string) bool {
+	s, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return s.Size() == 0
+}
+
 func CopyOver(src, dest string) error {
 	sf, err := os.Open(src)
 	if err != nil {

@@ -13,13 +13,22 @@ import (
 
 var logger = loggo.GetLogger("updater")
 var updateDurr = 5 * time.Minute
+var binaries = []string{
+	"barcode-scanner",
+	"updater",
+	"error-checker",
+}
+
+func init() {
+	loggo.GetLogger("").SetLogLevel(loggo.TRACE)
+}
 
 func main() {
 	cfg := config.Get()
 	ctx, exit := context.WithCancel(context.Background())
 
 	bot := telegram.New(ctx, cfg)
-	err := logwriter.Setup(bot)
+	err := logwriter.Setup(bot, cfg)
 	if err != nil {
 		logger.Criticalf("Failed initializing telegram bot: %v", err)
 		os.Exit(1)
@@ -31,16 +40,13 @@ func main() {
 		cfg:  cfg,
 	}
 	a.handleSignals()
-	err = a.setupUpdate([]string{
-		"barcode-scanner",
-		"updater",
-		"error-checker",
-	})
+	err = a.setupUpdate(binaries)
 	if err != nil {
 		logger.Criticalf("Failed setupUpdate: %v", err)
 		os.Exit(1)
 	}
 
+	// only exits on context cancellation
 	a.loop()
 
 	os.Exit(0)

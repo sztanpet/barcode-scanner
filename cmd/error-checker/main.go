@@ -2,35 +2,65 @@ package main
 
 import (
 	"context"
+	"flag"
+	"os"
+	"strings"
+	"time"
 
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/config"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/logwriter"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/telegram"
+	"github.com/juju/loggo"
 )
+
+type app struct {
+	ctx  context.Context
+	exit context.CancelFunc
+	cfg  *config.Config
+	bot  *telegram.Bot
+	bin  string
+}
+
+var logger = loggo.GetLogger("error-checker")
+var binary = flag.String("binary", "", "the base name of the binary to check")
+var logs = flag.String("logs", "", "the base name of the binaries for which logs should be checked, separated by commas\nif empty, defaults to the logs for the binary")
+
+func init() {
+	loggo.GetLogger("").SetLogLevel(loggo.TRACE)
+}
 
 func main() {
 	cfg := config.Get()
 	ctx, exit := context.WithCancel(context.Background())
-	bot := telegram.New(ctx, cfg)
 
+	bot := telegram.New(ctx, cfg)
 	err := logwriter.Setup(bot, cfg)
 	if err != nil {
-		panic("logwriter setup failed, impossible")
+		logger.Criticalf("Failed initializing telegram bot: %v", err)
+		os.Exit(1)
 	}
 
-	/*
-		TODO send logs
-		logPath = filepath.Join(
-			cfg.StatePath,
-			"barcode-scanner.log",
-		)
-	*/
+	flag.Parse()
+	if *binary == "" {
+		logger.Criticalf("-binary not specified!")
+		os.Exit(1)
+	}
+	if *logs == "" {
+		*logs = *binary
+	}
+	binaries := strings.Split(*logs, ",")
 
-	// https://www.freedesktop.org/software/systemd/man/systemd.exec.html#%24EXIT_CODE
-	// $EXIT_CODE is one of "exited", "killed", "dumped"
-	// $SERVICE_RESULT:
-	//    "success", "protocol", "timeout", "exit-code",
-	//    "signal", "core-dump", "watchdog", "start-limit-hit", "resources"
-	// $EXIT_STATUS: 0-255, or signal name
-	exit()
+	a := &app{
+		ctx:  ctx,
+		exit: exit,
+		cfg:  cfg,
+		bot:  bot,
+		bin:  *binary,
+	}
+	a.handleSignals()
+	a.handleLogs(binaries)
+	a.handleServiceError()
+
+	<-ctx.Done()
+	time.Sleep(250 * time.Millisecond)
 }

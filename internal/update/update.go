@@ -20,6 +20,7 @@ import (
 )
 
 const platform = runtime.GOOS + "-" + runtime.GOARCH
+const blacklistDir = "blacklisted-updates"
 
 var logger = loggo.GetLogger("main.update")
 var ErrFileInvalid = errors.New("File failed integrity check")
@@ -33,6 +34,8 @@ type Binary struct {
 	path string
 	// the current hash of the binary path
 	hash []byte
+	// base directory for blacklistDir
+	statePath string
 }
 
 // info is the information about the update version
@@ -50,10 +53,11 @@ func NewBinary(binPath string, cfg *config.Config) (*Binary, error) {
 
 	name := filepath.Base(binPath)
 	return &Binary{
-		Name:    name,
-		baseURL: cfg.UpdateBaseURL + "/" + name,
-		path:    binPath,
-		hash:    h,
+		Name:      name,
+		baseURL:   cfg.UpdateBaseURL + "/" + name,
+		path:      binPath,
+		statePath: cfg.StatePath,
+		hash:      h,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -78,6 +82,12 @@ func (b *Binary) signalFile() string {
 }
 
 func (b *Binary) Check() error {
+	if b.currentlyBlacklisted() {
+		if err := b.RestoreToBackup(); err != nil {
+			return err
+		}
+	}
+
 	u := b.getURL("version.json")
 	logger.Tracef("Checking url: %v", u)
 	req, err := http.NewRequest("GET", u, nil)
@@ -109,7 +119,55 @@ func (b *Binary) Check() error {
 		return nil
 	}
 
+	if b.backupBlacklisted(nfo.Hash) {
+		logger.Tracef("Update blacklisted %v (%v)", nfo.Hash, u)
+		// nothing to update, not an error, do not want to make it distinguishable
+		return nil
+	}
+
 	return b.download(nfo)
+}
+
+func (b *Binary) currentlyBlacklisted() bool {
+	return b.backupBlacklisted(hex.EncodeToString(b.hash))
+}
+
+func (b *Binary) RestoreToBackup() error {
+	// rename binary.bkup to binary, delete binary.bkup, mark that the binary should restart
+	bkupPath := b.path + ".bkup"
+	if !file.Exists(bkupPath) {
+		logger.Infof("backup does not exist, not restoring (%v)", bkupPath)
+		return nil
+	}
+
+	bf, err := os.Open(bkupPath)
+	if err != nil {
+		logger.Infof("could not open backup: %v", err)
+		return nil
+	}
+
+	err = file.WriteAtomically(b.path, bf)
+	_ = bf.Close()
+
+	if err != nil {
+		logger.Warningf("could not restore backup: %v", err)
+		return err
+	}
+
+	err = os.Remove(bkupPath)
+	if err != nil {
+		logger.Warningf("could not delete backup: %v", err)
+		return nil
+	}
+
+	sf, err := os.Create(b.signalFile())
+	if err != nil {
+		logger.Warningf("could not create signalfile: %v", err)
+	}
+
+	_ = sf.Close()
+	logger.Infof("restored to backup")
+	return nil
 }
 
 // domain.tld/<binary-base-name>/<GOOS>-<GOARCH>/<file>
@@ -200,7 +258,9 @@ func (b *Binary) update(r io.Reader, nfo *info) error {
 
 	// create signal file, ignore error
 	sf, _ := os.Create(b.signalFile())
-	_ = sf.Close()
+	if sf != nil {
+		_ = sf.Close()
+	}
 	return nil
 }
 
@@ -208,6 +268,11 @@ func (b *Binary) backup() error {
 	src := b.path
 	dest := src + ".bkup"
 	return file.CopyOver(src, dest)
+}
+
+func (b *Binary) backupBlacklisted(hash string) bool {
+	fp := filepath.Join(b.statePath, blacklistDir, hash)
+	return file.Exists(fp)
 }
 
 func getFileSha(path string) ([]byte, error) {
@@ -228,4 +293,22 @@ func getSha(r io.Reader) ([]byte, error) {
 	}
 
 	return h.Sum(nil), nil
+}
+
+// BlacklistUpdate marks binPath as an invalid update
+// by creating a marker file under statePath
+func BlacklistUpdate(binPath, statePath string) error {
+	h, err := getFileSha(binPath)
+	if err != nil {
+		return err
+	}
+
+	fp := filepath.Join(statePath, blacklistDir, hex.EncodeToString(h))
+	f, err := os.OpenFile(fp, os.O_CREATE, 0600)
+	if err != nil {
+		return err
+	}
+
+	_ = f.Close()
+	return nil
 }
