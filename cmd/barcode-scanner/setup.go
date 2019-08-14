@@ -57,6 +57,7 @@ func (a *app) setupUpdate() {
 		panic("update.NewBinary failed: " + err.Error())
 	}
 	a.upd = upd
+	a.upd.Cleanup()
 
 	a.addIdleTask(func() {
 		if a.upd.ShouldRestart() {

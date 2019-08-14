@@ -40,6 +40,7 @@ const (
 	INGRESS direction = 1
 )
 
+var settingsPath = "barcode-scanner/settings"
 var specialBarcodeRe = regexp.MustCompile(`(?i)^(INGRESS|EGRESS)-(\d+)$`)
 
 // TODO https://vincent.bernat.ch/en/blog/2017-systemd-golang
@@ -244,7 +245,7 @@ func (a *app) persistSettingsLocked() {
 		IdleStart: a.idleStart,
 	}
 
-	path := filepath.Join(a.cfg.StatePath, "barcode-scanner", "settings")
+	path := filepath.Join(a.cfg.StatePath, settingsPath)
 	if err := file.Serialize(path, s); err != nil {
 		logger.Warningf("Failed to serialize settings: %v", err)
 	}
@@ -255,7 +256,7 @@ func (a *app) inExtendedIdle() bool {
 }
 
 func (a *app) loadSettings() {
-	path := filepath.Join(a.cfg.StatePath, "barcode-scanner", "state", "settings")
+	path := filepath.Join(a.cfg.StatePath, settingsPath)
 	if !file.Exists(path) {
 		logger.Debugf("No state to restore, skipping")
 		return
@@ -269,11 +270,6 @@ func (a *app) loadSettings() {
 
 	if err := file.Unserialize(path, s); err != nil {
 		logger.Warningf("Failed to unserialize settings: %v", err)
-	}
-
-	if !a.inExtendedIdle() {
-		logger.Debugf("Settings too old, not restoring: %#v", s)
-		return
 	}
 
 	a.mu.Lock()
