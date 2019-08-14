@@ -14,9 +14,9 @@ import (
 var logger = loggo.GetLogger("updater")
 var updateDurr = 5 * time.Minute
 var binaries = []string{
-	"barcode-scanner",
-	"updater",
 	"error-checker",
+	"updater",
+	"barcode-scanner",
 }
 
 func init() {

@@ -43,8 +43,6 @@ const (
 var settingsPath = "barcode-scanner/settings"
 var specialBarcodeRe = regexp.MustCompile(`(?i)^(INGRESS|EGRESS)-(\d+)$`)
 
-// TODO https://vincent.bernat.ch/en/blog/2017-systemd-golang
-// TODO reverter binary
 type app struct {
 	ctx     context.Context
 	exit    context.CancelFunc
