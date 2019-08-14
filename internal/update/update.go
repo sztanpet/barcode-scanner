@@ -72,6 +72,7 @@ func (b *Binary) ShouldRestart() bool {
 
 // Cleanup removes the update signal file if present
 func (b *Binary) Cleanup() {
+	logger.Tracef("cleaning up signalfile: %v", b.signalFile)
 	_ = os.Remove(b.signalFile())
 }
 

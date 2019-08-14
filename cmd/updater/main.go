@@ -49,5 +49,6 @@ func main() {
 	// only exits on context cancellation
 	a.loop()
 
+	time.Sleep(250 * time.Millisecond)
 	os.Exit(0)
 }
