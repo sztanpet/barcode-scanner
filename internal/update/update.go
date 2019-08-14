@@ -174,7 +174,7 @@ func (b *Binary) RestoreToBackup() error {
 
 	_ = sf.Close()
 	b.updateHash()
-	logger.Infof("restored to backup")
+	logger.Infof("restored to backup: %v", b.Name)
 	return nil
 }
 
@@ -193,7 +193,7 @@ func (b *Binary) getURL(file string) string {
 
 // download loads the file from the version.json
 func (b *Binary) download(nfo *info) error {
-	logger.Tracef("downloading update: %#v", nfo)
+	logger.Tracef("downloading update: %v - %v", b.Name, nfo.Hash)
 	u := b.getURL(nfo.BinaryPath)
 
 	req, err := http.NewRequest("GET", u, nil)
