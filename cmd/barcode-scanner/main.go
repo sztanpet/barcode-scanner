@@ -146,7 +146,7 @@ func (a *app) handleTelegramMessage(msg string) {
 		return
 	}
 
-	logger.Debugf("logging spec successfully applied after reset, spec was: %v", spec)
+	logger.Debugf("logging spec successfully applied, spec was: %v", spec)
 }
 
 func (a *app) inputLoop() {

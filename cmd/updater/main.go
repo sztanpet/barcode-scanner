@@ -20,7 +20,7 @@ var binaries = []string{
 }
 
 func init() {
-	loggo.GetLogger("").SetLogLevel(loggo.TRACE)
+	loggo.GetLogger("").SetLogLevel(loggo.WARNING)
 }
 
 func main() {
