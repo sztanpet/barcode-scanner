@@ -32,20 +32,8 @@ func NewScreen(ctx context.Context) (*Screen, error) {
 	return ret, nil
 }
 
-// Lines returns the currently displayed lines of text on the screen
-func (s *Screen) Lines() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	ret := make([]string, 0, lineCount)
-	_ = copy(ret, s.lines)
-
-	return ret
-}
-
 // WriteTitle draws the text in black on a white background into the first line (line #0)
 func (s *Screen) WriteTitle(text string) {
-	s.MarkActivity()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lines[0] = text
@@ -53,7 +41,6 @@ func (s *Screen) WriteTitle(text string) {
 
 // WriteLine writes the text in white on black into the indicated line (usually #1 or #2)
 func (s *Screen) WriteLine(line int, text string) {
-	s.MarkActivity()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lines[line] = text
@@ -61,7 +48,6 @@ func (s *Screen) WriteLine(line int, text string) {
 
 // WriteHelp writes help text in black on white into the last line (line #3)
 func (s *Screen) WriteHelp(text string) {
-	s.MarkActivity()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -76,15 +62,6 @@ func (s *Screen) Draw() {
 
 // Blank blanks the screen without clearing the image
 func (s *Screen) Blank() {
-	s.MarkActivity()
-}
-
-// MarkActivity explicitly cancels the screen-saver (most anything else implicitly does it)
-func (s *Screen) MarkActivity() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.lastActive = time.Now()
 }
 
 func (s *Screen) ShouldBlank() bool {

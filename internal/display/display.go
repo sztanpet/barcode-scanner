@@ -25,7 +25,7 @@ import (
 var logger = loggo.GetLogger("main.display")
 
 // The ScreenTimeout duration after which the display is blanked to prevent burn-in.
-var ScreenTimeout = 1 * time.Hour
+var ScreenTimeout = 90 * time.Minute
 
 // lineCount defines how many lines of text fit on the screen
 const lineCount = 4
@@ -95,18 +95,8 @@ func NewScreen(ctx context.Context) (*Screen, error) {
 	return ret, nil
 }
 
-// Lines returns the currently displayed lines of text on the screen
-func (s *Screen) Lines() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	ret := make([]string, 0, lineCount)
-	_ = copy(ret, s.lines)
-
-	return ret
-}
-
 func (s *Screen) writeUnlocked(f font.Face, line int, c color.Color, centered bool, text string) {
+	s.markActivity()
 	m := f.Metrics()
 	height := s.img.Bounds().Dy() - m.Descent.Round()
 	// by default, 0th line is at the bottom, 3rd is at the top,
@@ -119,6 +109,12 @@ func (s *Screen) writeUnlocked(f font.Face, line int, c color.Color, centered bo
 		Face: f,
 		Dot:  fixed.P(0, height),
 	}
+	/*
+		TODO
+		if text == "" {
+			text = " "
+		}
+	*/
 	bounds, adv := drawer.BoundString(text)
 
 	// adjust text start position
@@ -142,7 +138,6 @@ func (s *Screen) writeUnlocked(f font.Face, line int, c color.Color, centered bo
 
 // WriteTitle draws the text in black on a white background into the first line (line #0)
 func (s *Screen) WriteTitle(text string) {
-	s.MarkActivity()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lines[0] = text
@@ -153,7 +148,6 @@ func (s *Screen) WriteTitle(text string) {
 
 // WriteLine writes the text in white on black into the indicated line (usually #1 or #2)
 func (s *Screen) WriteLine(line int, text string) {
-	s.MarkActivity()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lines[line] = text
@@ -164,7 +158,6 @@ func (s *Screen) WriteLine(line int, text string) {
 
 // WriteHelp writes help text in black on white into the last line (line #3)
 func (s *Screen) WriteHelp(text string) {
-	s.MarkActivity()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -204,17 +197,12 @@ func (s *Screen) Blank() {
 	}
 }
 
-// MarkActivity explicitly cancels the screen-saver (most anything else implicitly does it)
-func (s *Screen) MarkActivity() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+func (s *Screen) markActivity() {
 	if time.Now().Sub(s.lastActive) > 1*time.Hour {
 		logger.Tracef("activity after more than an hour")
 	}
 
 	s.lastActive = time.Now()
-	s.drawUnlocked()
 }
 
 func (s *Screen) ShouldBlank() bool {
