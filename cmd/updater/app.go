@@ -49,7 +49,7 @@ func (a *app) setupUpdate(binaryNames []string) error {
 			return fmt.Errorf("could not find %v at %v", n, bpath)
 		}
 
-		b, err := update.NewBinary(updpath, a.cfg)
+		b, err := update.NewBinary(bpath, a.cfg)
 		if err != nil {
 			logger.Criticalf("Could not create updater for: %v: %v", n, err)
 			return err
@@ -88,6 +88,7 @@ func (a *app) checkBinaries() {
 		if err != nil {
 			logger.Warningf("Could not check for updates for %v: %v", b.Name, err)
 		}
+		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -114,7 +115,7 @@ func (a *app) checkService() {
 	}
 
 	if len(out) != 0 {
-		logger.Tracef("service running with pid: %s", out)
+		logger.Tracef("barcode-scanner running with pid: %s", out)
 		return
 	}
 
