@@ -109,12 +109,13 @@ func (s *Screen) writeUnlocked(f font.Face, line int, c color.Color, centered bo
 		Face: f,
 		Dot:  fixed.P(0, height),
 	}
-	/*
-		TODO
-		if text == "" {
-			text = " "
-		}
-	*/
+
+	// the expectation is that when writing an empty text, the line is cleared
+	// if the text is empty, the bounds of the string will be zero and nothing will print
+	// and the display wont change; fix this by drawing a space
+	if text == "" {
+		text = " "
+	}
 	bounds, adv := drawer.BoundString(text)
 
 	// adjust text start position
