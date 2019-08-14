@@ -276,5 +276,5 @@ func (a *app) loadSettings() {
 	a.dir = direction(s.Direction)
 	a.currier = s.Currier
 	a.idleStart = s.IdleStart
-	logger.Debugf("Restored settings: %#v", s)
+	logger.Debugf("Restored settings (dir=%v, currier=%v, idleStart=%v)", s.Direction, s.Currier, s.IdleStart)
 }
