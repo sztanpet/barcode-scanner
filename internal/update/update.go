@@ -173,6 +173,7 @@ func (b *Binary) RestoreToBackup() error {
 	}
 
 	_ = sf.Close()
+	b.updateHash()
 	logger.Infof("restored to backup")
 	return nil
 }
@@ -278,6 +279,8 @@ func (b *Binary) update(r io.Reader, nfo *info) error {
 	if sf != nil {
 		_ = sf.Close()
 	}
+
+	b.updateHash()
 	return nil
 }
 
@@ -290,6 +293,16 @@ func (b *Binary) backup() error {
 func (b *Binary) backupBlacklisted(hash string) bool {
 	fp := filepath.Join(b.statePath, blacklistDir, hash)
 	return file.Exists(fp)
+}
+
+func (b *Binary) updateHash() {
+	h, err := getFileSha(b.path)
+	if err != nil {
+		logger.Errorf("updateHash failed: %v", err)
+		return
+	}
+
+	b.hash = h
 }
 
 func getFileSha(path string) ([]byte, error) {
