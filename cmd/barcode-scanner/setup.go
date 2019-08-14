@@ -111,14 +111,11 @@ func (a *app) setupScreen() {
 	}
 	a.screen = screen
 
+	a.screen.Clear()
 	a.screen.WriteTitle("STARTUP")
 	a.screen.WriteLine(1, "")
 	a.screen.WriteLine(2, "OK")
-	a.screen.WriteHelp("Scanner ready")
-
-	a.addIdleTask(func() {
-		a.screen.Blank()
-	})
+	a.screen.WriteHelp("scanner ready")
 }
 
 func (a *app) setupBuzzer() {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"time"
 	"unicode"
@@ -31,9 +32,23 @@ func (a *app) enterReadBarcode() {
 
 	// clear and init screen
 	a.screen.Clear()
-	a.screen.WriteTitle("SCANNER")
+	a.writeBarcodeTitle()
 	a.screen.WriteLine(1, "Barcode data:")
 	a.screen.WriteHelp("waiting for scan")
+}
+
+func (a *app) writeBarcodeTitle() {
+	var t string
+	if a.dir == EGRESS {
+		t = "EGRESS-"
+	} else if a.dir == INGRESS {
+		t = "INGRESS-"
+	} else {
+		panic(fmt.Sprintf("a.dir value is unexpected: %v", a.dir))
+	}
+	t += a.currier
+
+	a.screen.WriteTitle(t)
 }
 
 // handleBarcodeInput is only called by transitionState
@@ -70,14 +85,13 @@ func (a *app) handleBarcodeDone() {
 	}
 
 	a.mu.RLock()
-	defer a.mu.RUnlock()
-
 	b := storage.Barcode{
 		Barcode:        bc,
 		Direction:      a.dir.String(),
 		CurrierService: a.currier,
 		CreatedAt:      time.Now(),
 	}
+	a.mu.RUnlock()
 	logger.Tracef("inserting barcode: %#v", b)
 	a.storage.Insert(b)
 
@@ -110,5 +124,12 @@ func (a *app) handleSpecialBarcode(bc string) bool {
 	a.currier = matches[2]
 
 	a.persistSettingsLocked()
+	a.writeBarcodeTitle()
+
+	go func() {
+		if err := buzzer.SuccessBeep(); err != nil {
+			logger.Infof("buzzer.SuccessBeep failed: %v", err)
+		}
+	}()
 	return true
 }

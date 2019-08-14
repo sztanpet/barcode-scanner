@@ -32,6 +32,8 @@ func (a *app) enterWifiSetupPW() {
 	a.state = wifiSetupPW
 	a.currentLine.Reset()
 
+	a.screen.Clear()
+	a.screen.WriteTitle("WI-FI SETUP")
 	a.screen.WriteLine(1, "Password:")
 	a.screen.WriteLine(2, "")
 	a.screen.WriteHelp("(ESC to cancel)")
@@ -40,6 +42,8 @@ func (a *app) enterWifiSetupDone() {
 	a.state = wifiSetupDone
 	a.currentLine.Reset()
 
+	a.screen.Clear()
+	a.screen.WriteTitle("WI-FI SETUP")
 	a.screen.WriteLine(1, "Checking…")
 	a.screen.WriteLine(2, "Please wait…")
 	a.screen.WriteHelp("")

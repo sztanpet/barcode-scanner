@@ -181,6 +181,12 @@ func (a *app) inputLoop() {
 			return
 		}
 
+		// mark activity
+		select {
+		case a.activity <- struct{}{}:
+		default:
+		}
+
 		a.transitionState(r)
 	}
 }
@@ -206,6 +212,9 @@ func (a *app) idleLoop() {
 
 		case <-st.C:
 			a.status.Check()
+			if a.screen.ShouldBlank() {
+				a.screen.Blank()
+			}
 
 		case <-it.C:
 			if a.idleStart.IsZero() {
@@ -246,7 +255,7 @@ func (a *app) inExtendedIdle() bool {
 }
 
 func (a *app) loadSettings() {
-	path := filepath.Join(a.cfg.StatePath, "barcode-scanner", "state")
+	path := filepath.Join(a.cfg.StatePath, "barcode-scanner", "state", "settings")
 	if !file.Exists(path) {
 		logger.Debugf("No state to restore, skipping")
 		return
