@@ -26,6 +26,7 @@ var logger = loggo.GetLogger("main.update")
 var ErrFileInvalid = errors.New("File failed integrity check")
 
 type Binary struct {
+	// the basename of the binary
 	Name string
 	// the baseURL to contact for updates
 	baseURL string
@@ -115,12 +116,12 @@ func (b *Binary) Check() error {
 	}
 
 	if nfo.Hash == hex.EncodeToString(b.hash) {
-		logger.Tracef("No new update found (%v)", u)
+		logger.Tracef("No new update found (%v)", b.Name)
 		return nil
 	}
 
 	if b.backupBlacklisted(nfo.Hash) {
-		logger.Tracef("Update blacklisted %v (%v)", nfo.Hash, u)
+		logger.Tracef("Update blacklisted %v - %v (%v)", b.Name, nfo.Hash, u)
 		// nothing to update, not an error, do not want to make it distinguishable
 		return nil
 	}
@@ -151,6 +152,12 @@ func (b *Binary) RestoreToBackup() error {
 
 	if err != nil {
 		logger.Warningf("could not restore backup: %v", err)
+		return err
+	}
+
+	err = os.Chmod(b.path, 0755)
+	if err != nil {
+		logger.Errorf("chmod +x on binary %v failed: %v", b.path, err)
 		return err
 	}
 
@@ -213,6 +220,10 @@ func (b *Binary) update(r io.Reader, nfo *info) error {
 		return err
 	}
 	defer f.Close()
+	defer func() {
+		// cleanup the tmpfile, and ignore errors if cant
+		_ = os.Remove(f.Name())
+	}()
 
 	_, err = io.Copy(f, r)
 	if err != nil {
@@ -253,6 +264,12 @@ func (b *Binary) update(r io.Reader, nfo *info) error {
 	err = file.WriteAtomically(b.path, f)
 	if err != nil {
 		logger.Errorf("overwriting binary %v failed: %v", b.path, err)
+		return err
+	}
+
+	err = os.Chmod(b.path, 0755)
+	if err != nil {
+		logger.Errorf("chmod +x on binary %v failed: %v", b.path, err)
 		return err
 	}
 
