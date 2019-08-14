@@ -40,13 +40,13 @@ func (a *app) handleLogs(binaries []string) {
 
 func (a *app) handleLog(bin string) {
 	lp := filepath.Join(a.cfg.StatePath, bin+".log")
-	filename := bin + time.Now().Format("_20060102_150405_") + ".log.zip"
+	filename := bin + time.Now().Format("_20060102_150405") + ".log.zip"
 	a.sendAndTruncateFile(lp, filename)
 }
 
 func (a *app) handleOutput(binPath, bin string) {
 	op := filepath.Join(binPath, bin+".output")
-	filename := bin + time.Now().Format("_20060102_150405_") + ".out.zip"
+	filename := bin + time.Now().Format("_20060102_150405") + ".out.zip"
 	a.sendAndTruncateFile(op, filename)
 }
 
