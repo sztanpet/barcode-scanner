@@ -1,0 +1,14 @@
+[Unit]
+Description=Barcode-scanner updater service
+After=network-online.target
+
+[Service]
+ExecStart=/home/sztanpet/barcode-scanner/updater
+ExecStopPost=/home/sztanpet/barcode-scanner/error-checker --binary=updater
+StandardOutput=file:/home/sztanpet/barcode-scanner/updater.output
+StandardError=inherit
+EnvironmentFile=/home/sztanpet/barcode-scanner/conf.env
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
