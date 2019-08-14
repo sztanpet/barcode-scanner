@@ -55,6 +55,10 @@ func (a *app) setupUpdate(binaryNames []string) error {
 			return err
 		}
 
+		if n == "updater" {
+			b.Cleanup()
+		}
+
 		a.binaries = append(a.binaries, b)
 	}
 
