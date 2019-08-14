@@ -60,6 +60,7 @@ func main() {
 	a.handleSignals()
 	a.handleLogs(binaries)
 	a.handleServiceError()
+	exit()
 
 	<-ctx.Done()
 	time.Sleep(250 * time.Millisecond)

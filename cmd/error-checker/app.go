@@ -33,54 +33,65 @@ func (a *app) handleLogs(binaries []string) {
 
 	binPath := filepath.Join(filepath.Dir(updpath), a.bin)
 	for _, bin := range binaries {
-		a.handleLog(binPath, bin)
+		a.handleLog(bin)
+		a.handleOutput(binPath, bin)
 	}
 }
 
-func (a *app) handleLog(binPath, bin string) {
+func (a *app) handleLog(bin string) {
+	lp := filepath.Join(a.cfg.StatePath, bin+".log")
+	filename := bin + time.Now().Format("_20060102_150405_") + ".log.zip"
+	a.sendAndTruncateFile(lp, filename)
+}
+
+func (a *app) handleOutput(binPath, bin string) {
 	op := filepath.Join(binPath, bin+".output")
-	if !file.Exists(op) || file.Empty(op) {
-		logger.Tracef("log was empty: %v", op)
+	filename := bin + time.Now().Format("_20060102_150405_") + ".out.zip"
+	a.sendAndTruncateFile(op, filename)
+}
+
+func (a *app) sendAndTruncateFile(path, filename string) {
+	if !file.Exists(path) || file.Empty(path) {
+		logger.Tracef("log was empty: %v", path)
 		return
 	}
-	logger.Infof("zipping and sending log: %v", op)
+	logger.Infof("zipping and sending log: %v", path)
 
-	f, err := os.Open(op)
+	f, err := os.Open(path)
 	if err != nil {
-		logger.Warningf("could not open log %v, error was: %v", op, err)
+		logger.Warningf("could not pathen log %v, error was: %v", path, err)
 		return
 	}
 	defer f.Close()
 
 	buf := &bytes.Buffer{}
 	w := zip.NewWriter(buf)
-	zf, err := w.Create(filepath.Base(op))
+	zf, err := w.Create(filepath.Base(path))
 	if err != nil {
-		logger.Warningf("could not create zip file for log %v, error was: %v", op, err)
+		logger.Warningf("could not create zip file for log %v, error was: %v", path, err)
 		return
 	}
 
 	_, err = io.Copy(zf, f)
 	if err != nil {
-		logger.Warningf("could not copy log %v, error was: %v", op, err)
+		logger.Warningf("could not cpathy log %v, error was: %v", path, err)
 		return
 	}
 	err = w.Close()
 	if err != nil {
-		logger.Warningf("could not close zip for log %v, error was: %v", op, err)
+		logger.Warningf("could not close zip for log %v, error was: %v", path, err)
 		return
 	}
 
-	filename := bin + time.Now().Format("_20060102_150405_") + ".out.zip"
 	err = a.bot.SendFile(buf.Bytes(), filename, true)
 	if err != nil {
 		logger.Warningf("sending file failed: %v", err)
 		return
 	}
 
-	err = os.Truncate(op, 0)
+	err = os.Truncate(path, 0)
 	if err != nil {
-		logger.Warningf("truncating log %v failed: %v", op, err)
+		logger.Warningf("truncating log %v failed: %v", path, err)
 		return
 	}
 }
@@ -98,20 +109,13 @@ func (a *app) handleServiceError() {
 	srvResult := os.Getenv("SERVICE_RESULT")
 
 	// exitStatus containes the exit code
-	logger.Infof("%v %v (code: %v - result: %v)", a.bin, exitCode, exitStatus, srvResult)
+	logger.Infof("%v exited (code: %v - status: %v - result: %v)", a.bin, exitCode, exitStatus, srvResult)
 	if exitStatus == "0" && srvResult == "success" {
 		logger.Tracef("no error detected with binary %v", a.bin)
 		return
 	}
 
-	logger.Infof(
-		"error detected! EXIT_CODE=%q EXIT_STATUS=%q SERVICE_RESULT=%q",
-		exitCode,
-		exitStatus,
-		srvResult,
-	)
-
-	logger.Infof("blacklisting update")
+	logger.Infof("blacklisting update for %v", a.bin)
 	updpath, err := os.Executable()
 	if err != nil {
 		logger.Criticalf("os.Executable err: %v", err)
@@ -122,6 +126,7 @@ func (a *app) handleServiceError() {
 	err = update.BlacklistUpdate(binPath, a.cfg.StatePath)
 	if err != nil {
 		logger.Warningf("could not blacklist update: %v", err)
+		return
 	}
 
 	b, err := update.NewBinary(binPath, a.cfg)
