@@ -1,6 +1,8 @@
 package file
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/gob"
 	"io"
 	"io/ioutil"
@@ -146,4 +148,30 @@ func Append(path string, data []byte) error {
 	}
 
 	return nil
+}
+
+func ZipFile(in io.Reader, filename string) (*bytes.Buffer, error) {
+	buf := &bytes.Buffer{}
+	w := zip.NewWriter(buf)
+	f, err := w.Create(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = io.Copy(f, in)
+	if err != nil {
+		return nil, err
+	}
+
+	err = w.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+func ZipBytes(in []byte, filename string) (*bytes.Buffer, error) {
+	buf := bytes.NewBuffer(in)
+	return ZipFile(buf, filename)
 }
