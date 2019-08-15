@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"strconv"
 	"strings"
 	"syscall"
@@ -47,7 +48,7 @@ func New(ctx context.Context, bot *telegram.Bot) *Status {
 }
 
 func (s *Status) Check() {
-	si := sysinfo()
+	si := sysInfo()
 	if si == nil {
 		return
 	}
@@ -77,18 +78,18 @@ func temp() float64 {
 	t, err := ioutil.ReadFile("/sys/class/thermal/thermal_zone0/temp")
 	if err != nil {
 		logger.Warningf("reading /sys/class/thermal/thermal_zone0/temp failed: %v", err)
-		return math.Nan()
+		return math.NaN()
 	}
 	tt, err := strconv.Atoi(strings.TrimSpace(string(t)))
 	if err != nil {
 		logger.Warningf("could not parse temp output: %v, err: %v", tt, err)
-		return math.Nan()
+		return math.NaN()
 	}
 
 	return float64(tt) / 1000
 }
 
-func (s *Status) sysinfo() *sysinfo {
+func sysInfo() *sysinfo {
 	// based on https://github.com/capnm/sysinfo/blob/master/sysinfo.go#L37
 	ret := &sysinfo{}
 	si := syscall.Sysinfo_t{}
