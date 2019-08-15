@@ -60,6 +60,7 @@ func main() {
 	a.handleSignals()
 	a.handleLogs(binaries)
 	a.handleServiceError()
+	a.handleDmesg()
 	exit()
 
 	<-ctx.Done()

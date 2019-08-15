@@ -1,10 +1,8 @@
 package main
 
 import (
-	"archive/zip"
-	"bytes"
-	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -64,22 +62,9 @@ func (a *app) sendAndTruncateFile(path, filename string) {
 	}
 	defer f.Close()
 
-	buf := &bytes.Buffer{}
-	w := zip.NewWriter(buf)
-	zf, err := w.Create(filepath.Base(path))
+	buf, err := file.ZipFile(f, filepath.Base(path))
 	if err != nil {
 		logger.Warningf("could not create zip file for log %v, error was: %v", path, err)
-		return
-	}
-
-	_, err = io.Copy(zf, f)
-	if err != nil {
-		logger.Warningf("could not cpathy log %v, error was: %v", path, err)
-		return
-	}
-	err = w.Close()
-	if err != nil {
-		logger.Warningf("could not close zip for log %v, error was: %v", path, err)
 		return
 	}
 
@@ -142,4 +127,31 @@ func (a *app) handleServiceError() {
 	}
 
 	logger.Infof("restored backup for binary: %v", a.bin)
+}
+
+func (a *app) handleDmesg() {
+	cmd := exec.CommandContext(a.ctx, "dmesg", "-e", "-c")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Warningf("dmesg -e -c failed: %v", err)
+		return
+	}
+
+	if len(out) == 0 {
+		return
+	}
+
+	logger.Tracef("handling dmesg output")
+
+	// zip it
+	filename := time.Now().Format("20060102_150405") + "_dmesg.txt"
+	buf, err := file.ZipBytes(out, filename)
+	if err != nil {
+		logger.Warningf("zipping file failed: %v", err)
+	}
+
+	err = a.bot.SendFile(buf.Bytes(), filename+".zip", true)
+	if err != nil {
+		logger.Warningf("sending file failed: %v", err)
+	}
 }
