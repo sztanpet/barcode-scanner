@@ -50,6 +50,7 @@ func main() {
 	}
 	binaries := strings.Split(*logs, ",")
 
+	logger.Warningf("binary exited: %v, checking logs for: %v", *binary, binaries)
 	a := &app{
 		ctx:  ctx,
 		exit: exit,
