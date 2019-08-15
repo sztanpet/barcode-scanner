@@ -192,7 +192,6 @@ func (s *Screen) drawUnlocked() {
 
 // Blank blanks the screen without clearing the image
 func (s *Screen) Blank() {
-	logger.Tracef("blanking screen")
 	if err := s.dev.Halt(); err != nil {
 		logger.Errorf("halt error: %v", err)
 	}
