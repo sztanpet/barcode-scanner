@@ -61,7 +61,7 @@ func (a *app) setupUpdate() {
 
 	a.addIdleTask(func() {
 		if a.upd.ShouldRestart() {
-			logger.Warningf("update available, exiting cleanly")
+			logger.Criticalf("barcode-scanner restarting cleanly because of update")
 			a.exit()
 		}
 	})

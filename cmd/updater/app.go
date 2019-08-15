@@ -74,7 +74,7 @@ func (a *app) loop() {
 			return
 		case <-t.C:
 			if a.shouldRestart() {
-				logger.Infof("Updater restarting cleanly because of update")
+				logger.Criticalf("updater restarting cleanly because of update")
 				return
 			}
 

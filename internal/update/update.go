@@ -175,7 +175,7 @@ func (b *Binary) RestoreToBackup() error {
 
 	_ = sf.Close()
 	b.updateHash()
-	logger.Infof("restored to backup: %v", b.Name)
+	logger.Criticalf("restored to backup: %v - %v", b.Name, hex.EncodeToString(b.hash))
 	return nil
 }
 
@@ -282,6 +282,7 @@ func (b *Binary) update(r io.Reader, nfo *info) error {
 	}
 
 	b.updateHash()
+	logger.Criticalf("binary successfully updated: %v", b.Name)
 	return nil
 }
 
