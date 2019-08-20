@@ -90,10 +90,9 @@ func (a *app) setupTelegram() {
 	_ = a.bot.Send("BS-start @ "+time.Now().Format(time.RFC3339), true)
 
 	go func() {
-		err := a.bot.HandleMessage(a.handleTelegramMessage, false)
-
-		if err != nil {
-			logger.Criticalf("Handlemessage error: %v", err)
+		for {
+			_ = a.bot.HandleMessage(a.handleTelegramMessage, false)
+			time.Sleep(1 * time.Minute)
 		}
 	}()
 }

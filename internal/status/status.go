@@ -65,10 +65,7 @@ func (s *Status) Check() {
 		rootFSPercent(),
 		si.uptime,
 	)
-	err := s.bot.Send(msg, true)
-	if err != nil {
-		logger.Warningf("sending message failed: %v", err)
-	}
+	_ = s.bot.Send(msg, true)
 }
 
 func temp() float64 {
