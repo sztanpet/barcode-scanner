@@ -9,17 +9,13 @@ import (
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/wifi"
 )
 
-var wifiInfo struct {
-	ssid, pw string
-} = struct {
-	ssid, pw string
-}{}
+var WiFiAcc = wifi.Account{}
 
 // enterWifiSetup is only called by transitionState
 func (a *app) enterWifiSetup() {
 	a.state = wifiSetupSSID
-	wifiInfo.ssid = ""
-	wifiInfo.pw = ""
+	WiFiAcc.SSID = ""
+	WiFiAcc.PW = ""
 	a.currentLine.Reset()
 
 	a.screen.Clear()
@@ -48,7 +44,7 @@ func (a *app) enterWifiSetupDone() {
 	a.screen.WriteLine(2, "Please wait…")
 	a.screen.WriteHelp("")
 
-	err := wifi.Setup(wifiInfo.ssid, wifiInfo.pw)
+	err := wifi.StoreAndTry(a.ctx, a.cfg, WiFiAcc)
 	if err != nil {
 		a.screen.WriteLine(2, "Error!")
 		logger.Criticalf("wifi setup error: %v", err)
@@ -62,8 +58,8 @@ func (a *app) enterWifiSetupDone() {
 // cancelWifiSetup is only called by transitionState
 func (a *app) cancelWifiSetup() {
 	a.state = readBarcode
-	wifiInfo.ssid = ""
-	wifiInfo.pw = ""
+	WiFiAcc.SSID = ""
+	WiFiAcc.PW = ""
 	a.currentLine.Reset()
 	a.enterReadBarcode()
 }
@@ -80,13 +76,13 @@ func (a *app) handleWifiSetupInput(r rune) {
 		line := a.currentLine.String()
 		switch a.state {
 		case wifiSetupSSID:
-			wifiInfo.ssid = line
+			WiFiAcc.SSID = line
 			if len(line) > 0 {
 				a.enterWifiSetupPW()
 			}
 
 		case wifiSetupPW:
-			wifiInfo.pw = line
+			WiFiAcc.PW = line
 			if len(line) > 0 {
 				a.enterWifiSetupDone()
 			}

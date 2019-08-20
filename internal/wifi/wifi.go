@@ -6,18 +6,79 @@ import (
 	"context"
 	"net/http"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/config"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/file"
 	"github.com/juju/loggo"
 )
 
 var logger = loggo.GetLogger("main.wifi")
+var accountLimit = 2
 
-func Setup(ssid, pw string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+type Account struct {
+	SSID, PW string
+}
+
+func StoreAndTry(ctx context.Context, cfg *config.Config, acc Account) error {
+	if err := storeAccount(cfg, acc); err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	if err := connect(ctx, acc); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func accountPath(cfg *config.Config) string {
+	return filepath.Join(cfg.StatePath, "WiFiAccounts")
+}
+
+func storeAccount(cfg *config.Config, acc Account) error {
+	accounts, err := loadAccounts(cfg)
+	if err != nil {
+		return err
+	}
+
+	// does the account already exist?
+	for _, a := range accounts {
+		if a.SSID == acc.SSID && a.PW == acc.PW {
+			return nil
+		}
+	}
+
+	// push front
+	accounts = append([]Account{acc}, accounts...)
+	if len(accounts) > accountLimit {
+		// cut
+		accounts = accounts[:accountLimit]
+	}
+
+	if err := file.Serialize(accountPath(cfg), &accounts); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func loadAccounts(cfg *config.Config) (ret []Account, err error) {
+	p := accountPath(cfg)
+	if !file.Exists(p) {
+		return
+	}
+
+	err = file.Unserialize(accountPath(cfg), &ret)
+	return
+}
+
+func deleteConnections(ctx context.Context) error {
 	// nmcli -t -c no --fields NAME con show --active
 	cmd := exec.CommandContext(ctx, "nmcli", "-t", "-c", "no", "--fields", "NAME", "con", "show", "--active")
 	out, err := cmd.CombinedOutput()
@@ -54,58 +115,42 @@ func Setup(ssid, pw string) error {
 		return err
 	}
 
-	// nmcli device wifi connect <ssid> password <pw>
-	cmd = exec.CommandContext(ctx, "nmcli", "device", "wifi", "connect", ssid, "password", pw)
-	out, err = cmd.CombinedOutput()
+	return nil
+}
+
+func connect(ctx context.Context, acc Account) error {
+	if err := deleteConnections(ctx); err != nil {
+		return err
+	}
+
+	// nmcli device wifi connect <SSID> password <PW>
+	cmd := exec.CommandContext(ctx, "nmcli", "device", "wifi", "connect", acc.SSID, "password", acc.PW)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Criticalf("error running: nmcli device wifi connect %q password %q, error was: %v, output was: %s", ssid, pw, err, out)
-		// sadly to support pre-setup of a connection, this command won't work,
-		// because additinal info is needed and this command gets that information from the network scan
-		// and thus the network has to already exist when setting it up
-		// instead, add the connection with all the options manually like so:
-		// nmcli connection add type wifi con-name scanner-wifi wifi.ssid "$SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PSK"
-		cmd = exec.CommandContext(
-			ctx,
-			"nmcli", "connection", "add", "type", "wifi",
-			"con-name", "scanner-wifi",
-			"ifname", "*",
-			"ssid", ssid,
-		)
-		out, err = cmd.CombinedOutput()
-		if err != nil {
-			logger.Criticalf("error running: nmcli c add type wifi... error was: %v, output was: %s", err, out)
-			return err
-		}
-		cmd = exec.CommandContext(
-			ctx,
-			"nmcli", "connection", "modify", "name", "scanner-wifi",
-			"wifi-sec.key-mgmt", "wpa-psk",
-			"wifi-sec.psk", pw,
-		)
-		out, err = cmd.CombinedOutput()
-		if err != nil {
-			logger.Criticalf("error running: nmcli c modify scanner-wifi... error was: %v, output was: %s", err, out)
-			return err
-		}
+		logger.Criticalf("error running: nmcli device wifi connect %q password %q, error was: %v, output was: %s", acc.SSID, acc.PW, err, out)
+		return err
 	}
 
 	logger.Debugf("nmcli command output was: %s", out)
 	return nil
 }
-func Enable() error {
+
+func IsConnected() bool {
 	_, err := http.Get("http://clients3.google.com/generate_204")
-	if err == nil {
-		return nil
-	}
+	return err == nil
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "nmcli", "connection", "up", "scanner-wifi")
-	out, err := cmd.CombinedOutput()
+func Setup(ctx context.Context, cfg *config.Config) error {
+	accounts, err := loadAccounts(cfg)
 	if err != nil {
-		logger.Criticalf("error running: nmcli c up scanner-wifi error was: %v, output was: %s", err, out)
+		return err
 	}
 
-	return err
+	for _, a := range accounts {
+		if err := connect(ctx, a); err == nil {
+			return nil
+		}
+	}
+
+	return nil
 }

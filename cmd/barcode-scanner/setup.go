@@ -144,12 +144,16 @@ func (a *app) setupSettings() {
 
 func (a *app) setupWiFi() {
 	go func() {
+		t := time.NewTicker(1 * time.Minute)
 		for {
-			if err := wifi.Enable(); err == nil {
+			select {
+			case <-a.ctx.Done():
 				return
+			case <-t.C:
+				if !wifi.IsConnected() {
+					_ = wifi.Setup(a.ctx, a.cfg)
+				}
 			}
-
-			time.Sleep(30 * time.Second)
 		}
 	}()
 }

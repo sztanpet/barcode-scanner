@@ -15,7 +15,6 @@ type Config struct {
 	DatabaseDSN       string
 	TelegramToken     string
 	TelegramChannelID int64
-	Currier           string
 }
 
 func Get() *Config {
