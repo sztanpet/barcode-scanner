@@ -58,8 +58,26 @@ func Setup(ssid, pw string) error {
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		logger.Criticalf("error running: nmcli device wifi connect %q password %q, error was: %v, output was: %s", ssid, pw, err, out)
-		return err
+		// sadly to support pre-setup of a connection, this command won't work,
+		// because additinal info is needed and this command gets that information from the network scan
+		// and thus the network has to already exist when setting it up
+		// instead, add the connection with all the options manually like so:
+		// nmcli connection add type wifi con-name scanner-wifi wifi.ssid "$SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PSK"
+		cmd = exec.CommandContext(
+			ctx,
+			"nmcli", "connection", "add", "type", "wifi",
+			"con-name", "scanner-wifi",
+			"wifi.ssid", ssid,
+			"wifi-sec.key-mgmt", "wpa-psk",
+			"wifi-sec.psk", pw,
+		)
+		out, err = cmd.CombinedOutput()
+		if err != nil {
+			logger.Criticalf("error running: nmcli c add type wifi... error was: %v, output was: %s", err, out)
+			return err
+		}
 	}
-	logger.Debugf("nmcli device wifi connect %q password %q; output was: %s", ssid, pw, out)
+
+	logger.Debugf("nmcli command output was: %s", out)
 	return nil
 }
