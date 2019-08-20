@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"net/http"
 	"os/exec"
 	"strings"
 	"time"
@@ -67,17 +68,44 @@ func Setup(ssid, pw string) error {
 			ctx,
 			"nmcli", "connection", "add", "type", "wifi",
 			"con-name", "scanner-wifi",
-			"wifi.ssid", ssid,
-			"wifi-sec.key-mgmt", "wpa-psk",
-			"wifi-sec.psk", pw,
+			"ifname", "*",
+			"ssid", ssid,
 		)
 		out, err = cmd.CombinedOutput()
 		if err != nil {
 			logger.Criticalf("error running: nmcli c add type wifi... error was: %v, output was: %s", err, out)
 			return err
 		}
+		cmd = exec.CommandContext(
+			ctx,
+			"nmcli", "connection", "modify", "name", "scanner-wifi",
+			"wifi-sec.key-mgmt", "wpa-psk",
+			"wifi-sec.psk", pw,
+		)
+		out, err = cmd.CombinedOutput()
+		if err != nil {
+			logger.Criticalf("error running: nmcli c modify scanner-wifi... error was: %v, output was: %s", err, out)
+			return err
+		}
 	}
 
 	logger.Debugf("nmcli command output was: %s", out)
 	return nil
+}
+func Enable() error {
+	_, err := http.Get("http://clients3.google.com/generate_204")
+	if err == nil {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "nmcli", "connection", "up", "scanner-wifi")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Criticalf("error running: nmcli c up scanner-wifi error was: %v, output was: %s", err, out)
+	}
+
+	return err
 }

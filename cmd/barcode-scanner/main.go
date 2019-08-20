@@ -101,6 +101,7 @@ func main() {
 	a.setupUpdate()
 	// restore settings set by the user, only the inputLoop uses the info
 	a.setupSettings()
+	a.setupWiFi()
 
 	go a.inputLoop()
 	go a.idleLoop()

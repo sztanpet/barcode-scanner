@@ -13,6 +13,7 @@ import (
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/storage"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/telegram"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/update"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/wifi"
 )
 
 func (a *app) handleSignals() {
@@ -139,4 +140,16 @@ func (a *app) setupSettings() {
 			a.currier = "0"
 		}
 	})
+}
+
+func (a *app) setupWiFi() {
+	go func() {
+		for {
+			if err := wifi.Enable(); err == nil {
+				return
+			}
+
+			time.Sleep(30 * time.Second)
+		}
+	}()
 }
