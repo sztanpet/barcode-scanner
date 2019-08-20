@@ -144,6 +144,12 @@ func (a *app) setupSettings() {
 
 func (a *app) setupWiFi() {
 	go func() {
+		// try connecting right away if not connected
+		if !wifi.IsConnected() {
+			_ = wifi.Setup(a.ctx, a.cfg)
+		}
+
+		// otherwise check every minute if still connected and try reconnecting if not
 		t := time.NewTicker(1 * time.Minute)
 		for {
 			select {
