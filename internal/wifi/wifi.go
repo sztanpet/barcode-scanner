@@ -61,6 +61,7 @@ func storeAccount(cfg *config.Config, acc Account) error {
 		accounts = accounts[:accountLimit]
 	}
 
+	logger.Debugf("storing accounts: %v", accounts)
 	if err := file.Serialize(accountPath(cfg), &accounts); err != nil {
 		return err
 	}
@@ -71,10 +72,12 @@ func storeAccount(cfg *config.Config, acc Account) error {
 func loadAccounts(cfg *config.Config) (ret []Account, err error) {
 	p := accountPath(cfg)
 	if !file.Exists(p) {
+		logger.Debugf("accountPath did not exist, returning zero values")
 		return
 	}
 
 	err = file.Unserialize(accountPath(cfg), &ret)
+	logger.Debugf("loaded accounts: %#v error was: %v", ret, err)
 	return
 }
 
