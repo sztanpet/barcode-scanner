@@ -151,6 +151,7 @@ func Setup(ctx context.Context, cfg *config.Config) error {
 
 	for _, a := range accounts {
 		if err := connect(ctx, a); err == nil {
+			logger.Debugf("connected to: %v", a.SSID)
 			return nil
 		}
 	}
