@@ -17,6 +17,10 @@ func (a *app) handleReadBarcode(r rune) {
 		logger.Debugf("State: readBarcode -> wifiSetup (escape pressed)")
 		a.enterWifiSetup()
 		return
+	case tty.KeyArrowUp:
+		logger.Debugf("State: readBarcode -> wifiPrint (up pressed)")
+		a.enterWifiPrint()
+		return
 
 	case '\n':
 		a.handleBarcodeDone()

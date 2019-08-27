@@ -16,7 +16,6 @@ import (
 )
 
 var logger = loggo.GetLogger("main.wifi")
-var accountLimit = 2
 
 type Account struct {
 	SSID, PW string
@@ -38,38 +37,29 @@ func StoreAndTry(ctx context.Context, cfg *config.Config, acc Account) error {
 }
 
 func accountPath(cfg *config.Config) string {
-	return filepath.Join(cfg.StatePath, "WiFiAccounts")
+	return filepath.Join(cfg.StatePath, "WiFiAccount")
 }
 
 func storeAccount(cfg *config.Config, acc Account) error {
-	accounts, err := loadAccounts(cfg)
+	account, err := LoadAccount(cfg)
 	if err != nil {
 		return err
 	}
 
 	// does the account already exist?
-	for _, a := range accounts {
-		if a.SSID == acc.SSID && a.PW == acc.PW {
-			return nil
-		}
+	if account.SSID == acc.SSID && account.PW == acc.PW {
+		return nil
 	}
 
-	// push front
-	accounts = append([]Account{acc}, accounts...)
-	if len(accounts) > accountLimit {
-		// cut
-		accounts = accounts[:accountLimit]
-	}
-
-	logger.Debugf("storing accounts: %v", accounts)
-	if err := file.Serialize(accountPath(cfg), &accounts); err != nil {
+	logger.Debugf("storing account: %v", acc)
+	if err := file.Serialize(accountPath(cfg), &acc); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func loadAccounts(cfg *config.Config) (ret []Account, err error) {
+func LoadAccount(cfg *config.Config) (ret Account, err error) {
 	p := accountPath(cfg)
 	if !file.Exists(p) {
 		logger.Debugf("accountPath did not exist, returning zero values")
@@ -144,17 +134,12 @@ func IsConnected() bool {
 }
 
 func Setup(ctx context.Context, cfg *config.Config) error {
-	accounts, err := loadAccounts(cfg)
+	account, err := LoadAccount(cfg)
 	if err != nil {
 		return err
 	}
 
-	for _, a := range accounts {
-		if err := connect(ctx, a); err == nil {
-			logger.Debugf("connected to: %v", a.SSID)
-			return nil
-		}
-	}
-
-	return nil
+	err = connect(ctx, account)
+	logger.Debugf("wifi connect error for %v: %v", account, err)
+	return err
 }

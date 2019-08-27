@@ -7,6 +7,7 @@ const (
 	wifiSetupSSID
 	wifiSetupPW
 	wifiSetupDone
+	wifiPrint
 )
 
 func (s State) String() string {
@@ -19,6 +20,8 @@ func (s State) String() string {
 		return "wifiSetupPW"
 	case wifiSetupDone:
 		return "wifiSetupDone"
+	case wifiPrint:
+		return "wifiPrint"
 	default:
 		panic("unknown state " + string(rune(s+'0')))
 	}
@@ -29,6 +32,7 @@ default: readBarcode state
 
 readBarcode:
   - on escape -> wifiSetup
+    on up arrow -> wifiPrint
   - on enter -> readBarcodeDone
   - on invalid char -> ignore
   - on valid char -> append to currentLine
@@ -37,7 +41,7 @@ readBarcodeDone:
   - handle insertion into db
   - when done -> readBarcode
 
-wifiSetup (wifiSetupSSID, wifiSetupPW, wifiSetupDone), default: wifiSetupSSID
+wifiSetup (wifiSetupSSID, wifiSetupPW, wifiSetupDone, wifiPrint), default: wifiSetupSSID
 wifiSetupSSID:
   - on escape -> readBarcode
   - on invalid char -> ignore
@@ -56,12 +60,16 @@ wifiSetupDone:
   - show result on screen
   - wait 2 seconds so user can read it
   - transition back to readBarcode
+wifiPrint:
+  - display saved wifi account
+  - on pressing anything, returns to readBarcode
+
 */
 func (a *app) transitionState(r rune) {
 	//logger.Tracef("key pressed: %x %q", r, r)
 
 	switch a.state {
-	case wifiSetupSSID, wifiSetupPW, wifiSetupDone:
+	case wifiSetupSSID, wifiSetupPW, wifiSetupDone, wifiPrint:
 		a.handleWifiSetupInput(r)
 
 	case readBarcode:

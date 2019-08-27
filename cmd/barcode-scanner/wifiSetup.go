@@ -55,6 +55,25 @@ func (a *app) enterWifiSetupDone() {
 	a.doneWifiSetup()
 }
 
+func (a *app) enterWifiPrint() {
+	a.state = wifiPrint
+	a.currentLine.Reset()
+
+	a.screen.Clear()
+	a.screen.WriteTitle("WI-FI INFO")
+	a.screen.WriteHelp("(any key to return)")
+
+	acc, err := wifi.LoadAccount(a.cfg)
+	if err != nil {
+		a.screen.WriteLine(1, "Error loading info")
+		a.screen.WriteLine(2, err.Error())
+		return
+	}
+
+	a.screen.WriteLine(1, "SSID: "+acc.SSID)
+	a.screen.WriteLine(2, "PW: "+acc.PW)
+}
+
 // cancelWifiSetup is only called by transitionState
 func (a *app) cancelWifiSetup() {
 	a.state = readBarcode
@@ -89,6 +108,8 @@ func (a *app) handleWifiSetupInput(r rune) {
 
 		case wifiSetupDone:
 			// nothing to do
+		case wifiPrint:
+			a.cancelWifiSetup()
 		default:
 			panic("unhandled state " + string(rune(a.state+'0')))
 		}
@@ -98,6 +119,10 @@ func (a *app) handleWifiSetupInput(r rune) {
 		a.cancelWifiSetup()
 
 	case tty.KeyBackspace, tty.KeyDelete:
+		if a.state == wifiPrint {
+			a.cancelWifiSetup()
+			return
+		}
 		// https://stackoverflow.com/questions/39907667/how-to-remove-unicode-characters-from-byte-buffer-in-go
 		if a.currentLine.Len() >= 1 {
 			b := a.currentLine.Bytes()
@@ -115,6 +140,11 @@ func (a *app) handleWifiSetupInput(r rune) {
 			logger.Tracef("handleWifiSetupInput: backspace")
 		}
 	default:
+		if a.state == wifiPrint {
+			a.cancelWifiSetup()
+			return
+		}
+
 		if unicode.IsPrint(r) {
 			_, _ = a.currentLine.WriteRune(r)
 			a.screen.WriteLine(2, a.currentLine.String())
