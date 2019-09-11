@@ -135,9 +135,12 @@ func (a *app) setupBuzzer() {
 func (a *app) setupSettings() {
 	a.loadSettings()
 	a.addIdleTask(func() {
-		if a.inExtendedIdle() {
+		if a.inExtendedIdle() && (a.dir != EGRESS || a.currier != "0") {
 			a.dir = EGRESS
 			a.currier = "0"
+			a.persistSettingsLocked()
+			a.writeBarcodeTitle()
+			a.screen.Blank()
 		}
 	})
 }
