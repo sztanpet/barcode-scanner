@@ -1,9 +1,11 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"database/sql"
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -20,13 +22,14 @@ import (
 // Storage persists Barcodes to disk before inserting them into a database
 type Storage struct {
 	ctx    context.Context
-	path   string
+	path   string // processPath iterates this dir, consuming files for insertion
 	dsn    string
 	db     *sql.DB
 	insert chan inData
 
-	stmtMu sync.RWMutex
-	inStmt *sql.Stmt
+	stmtMu   sync.RWMutex
+	inStmt   *sql.Stmt
+	deviceid uint64
 
 	bufMu sync.Mutex
 	inBuf map[[20]byte]Barcode
@@ -47,6 +50,7 @@ type Barcode struct {
 
 var logger = loggo.GetLogger("main.storage")
 var pathProcessDurr = 1 * time.Minute
+var DeviceIDMissingErr = errors.New("deviceid not set")
 
 // TODO mysql: use ssl connections only, SET GLOBAL require_secure_transport ON
 // dsn options: ?loc=UTC&parseTime=true&strict=true&timeout=1s&time_zone="+00:00"
@@ -265,7 +269,11 @@ func (s *Storage) processPath(ctx context.Context) {
 }
 
 func (s *Storage) dbInsert(row Barcode) error {
-	err := s.ensureStatement()
+	err := s.ensureDeviceID()
+	if err != nil {
+		return err
+	}
+	err = s.ensureStatement()
 	if err != nil {
 		return err
 	}
@@ -278,32 +286,36 @@ func (s *Storage) dbInsert(row Barcode) error {
 	// the result is irrelevant, only the error matters
 	_, err = s.inStmt.ExecContext(
 		ctx,
+		s.deviceid,
 		row.Barcode,
 		row.Direction,
 		row.CurrierService,
 		row.CreatedAt.UnixNano(),
 	)
 
-	if err != nil {
-		me, ok := err.(*mysql.MySQLError)
-		if !ok {
-			return err
-		}
-
-		//  ignore unique error
-		// uniqe error codes from:
-		// https://dev.mysql.com/doc/refman/5.7/en/server-error-reference.html
-		switch me.Number {
-		case 1062, 1586:
-			return nil
-		}
-
+	if err != nil && !isUniqueSqlError(err) {
 		return err
 	}
 
 	return nil
 }
 
+func isUniqueSqlError(err error) bool {
+	me, ok := err.(*mysql.MySQLError)
+	if !ok {
+		return false
+	}
+
+	//  ignore unique error
+	// uniqe error codes from:
+	// https://dev.mysql.com/doc/refman/5.7/en/server-error-reference.html
+	switch me.Number {
+	case 1062, 1586:
+		return true
+	}
+
+	return false
+}
 func (s *Storage) ensureStatement() error {
 	// take read lock first to check if inStmt is nil or not
 	// and if it is, take a write lock to set it
@@ -322,8 +334,8 @@ func (s *Storage) ensureStatement() error {
 	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
 	defer cancel()
 	stmt, err := s.db.PrepareContext(ctx, `
-		INSERT INTO barcodes (barcode, direction, currier_service, created_at, timestamp)
-		VALUES (?, ?, ?, ?, NOW())
+		INSERT INTO barcodes (deviceid, barcode, direction, currier_service, created_at, timestamp)
+		VALUES (?, ?, ?, ?, ?, NOW())
 	`)
 	if err != nil {
 		return err
@@ -331,4 +343,80 @@ func (s *Storage) ensureStatement() error {
 	s.inStmt = stmt
 
 	return nil
+}
+func (s *Storage) ensureDeviceID() error {
+	s.stmtMu.RLock()
+	defer s.stmtMu.RUnlock()
+
+	if s.deviceid == 0 {
+		return DeviceIDMissingErr
+	}
+
+	return nil
+}
+
+func (s *Storage) SetupDevice(cfg *config.Config) (did uint64, err error) {
+	// is the deviceid cached?
+	dip := filepath.Join(cfg.StatePath, "deviceid")
+	if file.Exists(dip) {
+		if err := file.Unserialize(dip, &did); err != nil {
+			return 0, err
+		}
+
+		return
+	}
+
+	// not cached, try to generate it
+	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
+	defer cancel()
+	stmt, err := s.db.PrepareContext(ctx, `
+		INSERT INTO devices (machineid, created_at)
+		VALUES (?, NOW())
+	`)
+	if err != nil {
+		return
+	}
+
+	mid, err := ioutil.ReadFile("/etc/machine-id")
+	if err != nil {
+		return
+	}
+	mid = bytes.TrimSpace(mid)
+	if len(mid) != 32 {
+		panic("invalid contents of /etc/machine-id: " + string(mid))
+	}
+
+	_, err = stmt.ExecContext(ctx, string(mid))
+	if !isUniqueSqlError(err) {
+		return
+	}
+
+	stmt, err = s.db.PrepareContext(ctx, `
+		SELECT id
+		FROM devices
+		WHERE machine_id = ?
+		LIMIT 1
+	`)
+	if err != nil {
+		return
+	}
+
+	rows, err := stmt.QueryContext(ctx, string(mid))
+	if err != nil {
+		return
+	}
+
+	s.stmtMu.Lock()
+	defer s.stmtMu.Unlock()
+	if !rows.Next() {
+		panic("did not find deviceid for machineid: " + string(mid))
+	}
+
+	err = rows.Scan(&did)
+	if err != nil {
+		return
+	}
+
+	err = file.Serialize(dip, did)
+	return
 }

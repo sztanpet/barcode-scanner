@@ -82,6 +82,21 @@ func (a *app) setupStorage() {
 	a.storage = storage
 }
 
+func (a *app) setupDeviceID() {
+	go func() {
+		for {
+			did, err := a.storage.SetupDevice(a.cfg)
+			if err == nil {
+				a.mu.Lock()
+				a.deviceid = did
+				a.mu.Unlock()
+				return
+			}
+			time.Sleep(1 * time.Minute)
+		}
+	}()
+}
+
 func (a *app) setupTelegram() {
 	if a.ctx.Err() != nil {
 		return

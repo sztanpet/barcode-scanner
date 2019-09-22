@@ -59,9 +59,10 @@ type app struct {
 	idleTasks   []func()
 	idleStart   time.Time
 
-	mu      sync.RWMutex
-	dir     direction
-	currier string
+	mu       sync.RWMutex
+	dir      direction
+	currier  string
+	deviceid uint64
 }
 
 var logger = loggo.GetLogger("barcode-scanner")
@@ -102,6 +103,7 @@ func main() {
 	// restore settings set by the user, only the inputLoop uses the info
 	a.setupSettings()
 	a.setupWiFi()
+	a.setupDeviceID()
 
 	go a.inputLoop()
 	go a.idleLoop()
