@@ -48,7 +48,7 @@ func New(ctx context.Context, cfg *config.Config) *Bot {
 	t := &Bot{
 		ctx:       ctx,
 		token:     cfg.TelegramToken,
-		prefix:    "[" + cfg.MachineID[:4] + "] ",
+		prefix:    "[" + cfg.MachineID[:4] + "]",
 		channelID: cfg.TelegramChannelID,
 		api:       api,
 		// limmit message spam to once every MaxSendDurr
