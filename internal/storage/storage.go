@@ -363,6 +363,7 @@ func (s *Storage) SetupDevice(cfg *config.Config) (did uint64, err error) {
 			return 0, err
 		}
 
+		s.deviceid = did
 		return
 	}
 
@@ -418,5 +419,6 @@ func (s *Storage) SetupDevice(cfg *config.Config) (did uint64, err error) {
 	}
 
 	err = file.Serialize(p, did)
+	s.deviceid = did
 	return did, err
 }
