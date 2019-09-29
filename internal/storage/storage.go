@@ -370,7 +370,7 @@ func (s *Storage) SetupDevice(cfg *config.Config) (did uint64, err error) {
 	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
 	defer cancel()
 	stmt, err := s.db.PrepareContext(ctx, `
-		INSERT INTO devices (machineid, created_at)
+		INSERT INTO devices (machine_id, created_at)
 		VALUES (?, NOW())
 	`)
 	if err != nil {
