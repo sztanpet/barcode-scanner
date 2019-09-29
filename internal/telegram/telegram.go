@@ -139,7 +139,7 @@ func (t *Bot) SendFile(data []byte, filename string, disableNotification bool) e
 	defer t.mu.Unlock()
 
 	r := tgbotapi.FileBytes{
-		Name:  t.prefix[1:4] + "-" + filename,
+		Name:  t.prefix[1:5] + "-" + filename,
 		Bytes: data,
 	}
 
