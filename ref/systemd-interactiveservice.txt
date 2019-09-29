@@ -1,0 +1,11 @@
+There is a fairly fundamental thing about dæmons that you're missing: As standard they don't have controlling terminals. They don't have open file handles for terminal devices. Anything that expects to talk to "the terminal" won't do so. There is no "the terminal".
+
+No, $TERM doesn't specify "the terminal". It specifies the terminal type, i.e. what escape sequences to send as output and to interpret as input. It is needed here, and you'll have to arrange for it to be set to an appropriate value. But it's not the major factor here. The major factor is that there is no "the terminal".
+
+Yes, the output ends up in /var/log/messages. The standard output of a service goes to the journal by default under systemd, and you've evidently got a syslogd of some sort running. That you saw this only after $TERM was set simply means that your script got further along, past the part where it needed to know the terminal type in order to work out how it was going to output things.
+
+systemd does have the ability to attach dæmons to terminals. It has to have. It runs agetty as a daemon to provide the login sessions on virtual terminals.
+
+What you are looking for are the StandardInput=, StandardOutput=, and TTYPath= settings, to add to that unit file in your question. Have a look in /usr/lib/systemd/system/getty@.service to see them in use.
+
+You don't give enough information in your question as to whether this is precisely the right approach, or whether instead you should be adding an ExecStartPre= to a custom /etc/systemd/system/getty@.service. It all depends from whether this is something to be run once before starting a GUI, or every time before every individual (TUI) login.  Before=graphical.target hints at the former, but this could be not what you actually wanted (given the RequiredBy=). ☺

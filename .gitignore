@@ -1,0 +1,4 @@
+auto-update/bucket/**
+auto-update/config.php
+.vscode
+*-sublime.*
