@@ -418,5 +418,5 @@ func (s *Storage) SetupDevice(cfg *config.Config) (did uint64, err error) {
 	}
 
 	err = file.Serialize(p, did)
-	return 0, err
+	return did, err
 }
