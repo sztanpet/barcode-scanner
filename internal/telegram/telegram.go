@@ -18,6 +18,7 @@ var MaxSendDurr = 500 * time.Millisecond
 type Bot struct {
 	ctx       context.Context
 	token     string
+	prefix    string
 	channelID int64
 	limiter   *rate.Limiter
 
@@ -42,9 +43,12 @@ func New(ctx context.Context, cfg *config.Config) *Bot {
 		api = nil
 	}
 
+	// prefix assumption: first 4 bytes of a 128bit machine-id
+	// uniquely identifies the machine
 	t := &Bot{
 		ctx:       ctx,
 		token:     cfg.TelegramToken,
+		prefix:    "[" + cfg.MachineID[:4] + "] ",
 		channelID: cfg.TelegramChannelID,
 		api:       api,
 		// limmit message spam to once every MaxSendDurr
@@ -79,6 +83,8 @@ func (t *Bot) Send(txt string, disableNotification bool) (err error) {
 
 	const postfixLength = 4
 	const maxMessageSize = 4096 // https://github.com/yagop/node-telegram-bot-api/issues/165
+
+	txt = t.prefix + txt
 	// 9*4092 bytes should be enough for everybody...
 	if len(txt) > 9*(maxMessageSize-postfixLength) {
 		return errors.New("Message too long")
@@ -133,7 +139,7 @@ func (t *Bot) SendFile(data []byte, filename string, disableNotification bool) e
 	defer t.mu.Unlock()
 
 	r := tgbotapi.FileBytes{
-		Name:  filename,
+		Name:  t.prefix[1:4] + "-" + filename,
 		Bytes: data,
 	}
 

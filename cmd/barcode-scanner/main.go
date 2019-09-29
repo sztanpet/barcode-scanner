@@ -59,10 +59,9 @@ type app struct {
 	idleTasks   []func()
 	idleStart   time.Time
 
-	mu       sync.RWMutex
-	dir      direction
-	currier  string
-	deviceid uint64
+	mu      sync.RWMutex
+	dir     direction
+	currier string
 }
 
 var logger = loggo.GetLogger("barcode-scanner")

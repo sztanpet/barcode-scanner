@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bytes"
+	"io/ioutil"
 	"os"
 	"strconv"
 
@@ -15,6 +17,7 @@ type Config struct {
 	DatabaseDSN       string
 	TelegramToken     string
 	TelegramChannelID int64
+	MachineID         string
 }
 
 func Get() *Config {
@@ -60,5 +63,20 @@ func Get() *Config {
 		DatabaseDSN:       DatabaseDSN,
 		TelegramToken:     TelegramToken,
 		TelegramChannelID: TelegramChannelID,
+		MachineID:         machineID(),
 	}
+}
+
+func machineID() string {
+	mid, err := ioutil.ReadFile("/etc/machine-id")
+	if err != nil {
+		panic("failed reading /etc/machine-id: " + err.Error())
+	}
+
+	mid = bytes.TrimSpace(mid)
+	if len(mid) != 32 {
+		panic("invalid contents of /etc/machine-id: " + string(mid))
+	}
+
+	return string(mid)
 }

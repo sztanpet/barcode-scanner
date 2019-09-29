@@ -357,9 +357,9 @@ func (s *Storage) ensureDeviceID() error {
 
 func (s *Storage) SetupDevice(cfg *config.Config) (did uint64, err error) {
 	// is the deviceid cached?
-	dip := filepath.Join(cfg.StatePath, "deviceid")
-	if file.Exists(dip) {
-		if err := file.Unserialize(dip, &did); err != nil {
+	p := filepath.Join(cfg.StatePath, "deviceid")
+	if file.Exists(p) {
+		if err = file.Unserialize(p, &did); err != nil {
 			return 0, err
 		}
 
@@ -374,12 +374,12 @@ func (s *Storage) SetupDevice(cfg *config.Config) (did uint64, err error) {
 		VALUES (?, NOW())
 	`)
 	if err != nil {
-		return
+		return 0, err
 	}
 
 	mid, err := ioutil.ReadFile("/etc/machine-id")
 	if err != nil {
-		return
+		return 0, err
 	}
 	mid = bytes.TrimSpace(mid)
 	if len(mid) != 32 {
@@ -388,7 +388,7 @@ func (s *Storage) SetupDevice(cfg *config.Config) (did uint64, err error) {
 
 	_, err = stmt.ExecContext(ctx, string(mid))
 	if !isUniqueSqlError(err) {
-		return
+		return 0, err
 	}
 
 	stmt, err = s.db.PrepareContext(ctx, `
@@ -398,12 +398,12 @@ func (s *Storage) SetupDevice(cfg *config.Config) (did uint64, err error) {
 		LIMIT 1
 	`)
 	if err != nil {
-		return
+		return 0, err
 	}
 
 	rows, err := stmt.QueryContext(ctx, string(mid))
 	if err != nil {
-		return
+		return 0, err
 	}
 
 	s.stmtMu.Lock()
@@ -414,9 +414,9 @@ func (s *Storage) SetupDevice(cfg *config.Config) (did uint64, err error) {
 
 	err = rows.Scan(&did)
 	if err != nil {
-		return
+		return 0, err
 	}
 
-	err = file.Serialize(dip, did)
-	return
+	err = file.Serialize(p, did)
+	return 0, err
 }

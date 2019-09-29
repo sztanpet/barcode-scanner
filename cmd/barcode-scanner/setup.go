@@ -87,11 +87,10 @@ func (a *app) setupDeviceID() {
 		for {
 			did, err := a.storage.SetupDevice(a.cfg)
 			if err == nil {
-				a.mu.Lock()
-				a.deviceid = did
-				a.mu.Unlock()
+				logger.Tracef("got deviceid: %v", did)
 				return
 			}
+			logger.Tracef("failed to get deviceid retrying in a minute, err: %v", err)
 			time.Sleep(1 * time.Minute)
 		}
 	}()
