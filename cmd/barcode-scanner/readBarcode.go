@@ -116,20 +116,27 @@ func (a *app) handleSpecialBarcode(bc string) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	switch strings.ToUpper(matches[1]) {
-	case "EGRESS":
-		a.dir = EGRESS
-	case "INGRESS":
-		a.dir = INGRESS
-	default:
-		panic("unexpected direction: " + matches[1])
+	if matches[3] != "" {
+		// barcode for wifi setup
+		WiFiAcc.SSID = matches[3]
+		WiFiAcc.PW = matches[4]
+		a.enterWifiSetupDone()
+	} else {
+		// direction and currier handling
+		switch strings.ToUpper(matches[1]) {
+		case "EGRESS":
+			a.dir = EGRESS
+		case "INGRESS":
+			a.dir = INGRESS
+		default:
+			panic("unexpected direction: " + matches[1])
+		}
+
+		a.currier = matches[2]
+
+		a.persistSettingsLocked()
+		a.writeBarcodeTitle()
 	}
-
-	a.currier = matches[2]
-
-	a.persistSettingsLocked()
-	a.writeBarcodeTitle()
-
 	go func() {
 		if err := buzzer.SuccessBeep(); err != nil {
 			logger.Infof("buzzer.SuccessBeep failed: %v", err)

@@ -55,6 +55,8 @@ wifiSetupPW:
   - on backspace/delete -> delete last char from currentLine, display on screen
   - on enter -> save currentLine as PW, transition to wifiSetupDone
 wifiSetupDone:
+  - from wifiSetupPW
+  - from special barcode that sets the ssid and pw directly
   - display pre-setup message on screen
   - do setup (might take time)
   - show result on screen

@@ -41,7 +41,7 @@ const (
 )
 
 var settingsPath = "barcode-scanner/settings"
-var specialBarcodeRe = regexp.MustCompile(`(?i)^(INGRESS|EGRESS)-(\d+)$`)
+var specialBarcodeRe = regexp.MustCompile(`(?i)(?:^(INGRESS|EGRESS)-(\d+)$|^WIFISETUP:([^|]+)\|(.*)$)`)
 
 type app struct {
 	ctx     context.Context
