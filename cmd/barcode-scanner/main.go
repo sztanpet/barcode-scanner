@@ -214,8 +214,7 @@ func (a *app) idleLoop() {
 		case <-st.C:
 			a.status.Check()
 			if a.screen.ShouldBlank() {
-				// TODO uncomment if there is a status led
-				//a.screen.Blank()
+				a.screen.Blank()
 			}
 
 		case <-it.C:

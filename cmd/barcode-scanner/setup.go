@@ -154,8 +154,7 @@ func (a *app) setupSettings() {
 			a.currier = "0"
 			a.persistSettingsLocked()
 			a.writeBarcodeTitle()
-			// TODO uncomment if there is a status led
-			//a.screen.Blank()
+			a.screen.Blank()
 		}
 	})
 }
