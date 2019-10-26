@@ -183,14 +183,26 @@ func (a *app) setupWiFi() {
 			_ = wifi.Setup(a.ctx, a.cfg)
 		}
 
-		// otherwise check every minute if still connected and try reconnecting if not
-		t := time.NewTicker(1 * time.Minute)
+		// otherwise check every N minutes if still connected and try reconnecting if not
+		t := time.NewTicker(5 * time.Minute)
 		for {
 			select {
 			case <-a.ctx.Done():
 				return
 			case <-t.C:
-				if !wifi.IsConnected() {
+				// check 3 times if we are not connected (to detect a transient wifi connection)
+				// should reduce spurious wifi re-initialization
+				ok := false
+				for i := 3; i > 0; i-- {
+					if a.ctx.Err() != nil || wifi.IsConnected() {
+						ok = true
+						break
+					}
+
+					time.Sleep(30 * time.Second)
+				}
+
+				if !ok {
 					_ = wifi.Setup(a.ctx, a.cfg)
 				}
 			}
