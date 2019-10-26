@@ -15,8 +15,12 @@ $binaries = [
     "updater",
 ];
 
+function shouldUploadToS3() {
+  global $argc, $argv;
+  return !($argc != 2 or $argv[1] !== "deploy");
+}
 
-if ( $argc != 2 and $argv[1] !== "deploy" ) {
+if ( !shouldUploadToS3() ) {
   logMsg("no 'deploy' argument passed, assuming build-only mode!");
 }
 
@@ -27,7 +31,7 @@ foreach( $binaries as $bin ) {
     logMsg(" ");
 }
 
-if ( $argc > 1 ) {
+if ( !shouldUploadToS3() ) {
   logMsg("Skipping upload to S3!");
   logMsg("Done!");
   return;
