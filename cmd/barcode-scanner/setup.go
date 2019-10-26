@@ -203,6 +203,7 @@ func (a *app) setupWiFi() {
 				}
 
 				if !ok {
+					logger.Warningf("no internet connection detected, running wifi.Setup")
 					_ = wifi.Setup(a.ctx, a.cfg)
 				}
 			}
