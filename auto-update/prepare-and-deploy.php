@@ -15,11 +15,22 @@ $binaries = [
     "updater",
 ];
 
+
+if ( $argc > 1 ) {
+  logMsg("More than 1 argument passed, assuming build-only mode!");
+}
+
 foreach( $binaries as $bin ) {
     buildBinary( $bin );
     copyBinaryToBucket( $bin );
     assembleVersion( $bin );
     logMsg(" ");
+}
+
+if ( $argc > 1 ) {
+  logMsg("Skipping upload to S3!");
+  logMsg("Done!");
+  return;
 }
 
 uploadToS3();
