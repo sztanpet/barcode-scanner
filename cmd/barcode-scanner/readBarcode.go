@@ -6,7 +6,6 @@ import (
 	"time"
 	"unicode"
 
-	"code.sztanpet.net/zvpsz/barcode-scanner/internal/buzzer"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/storage"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/tty"
 )
@@ -75,11 +74,7 @@ func (a *app) handleBarcodeDone() {
 	if len(line) == 0 {
 		logger.Debugf("handleBarcodeInput: empty currentLine, skipping")
 
-		go func() {
-			if err := buzzer.FailBeep(); err != nil {
-				logger.Infof("buzzer.FailBeep failed: %v", err)
-			}
-		}()
+		go a.failFeedback()
 		return
 	}
 
@@ -99,11 +94,7 @@ func (a *app) handleBarcodeDone() {
 	logger.Tracef("inserting barcode: %#v", b)
 	a.storage.Insert(b)
 
-	go func() {
-		if err := buzzer.SuccessBeep(); err != nil {
-			logger.Infof("buzzer.SuccessBeep failed: %v", err)
-		}
-	}()
+	go a.successFeedback()
 }
 
 func (a *app) handleSpecialBarcode(bc string) bool {
@@ -137,10 +128,6 @@ func (a *app) handleSpecialBarcode(bc string) bool {
 		a.persistSettingsLocked()
 		a.writeBarcodeTitle()
 	}
-	go func() {
-		if err := buzzer.SuccessBeep(); err != nil {
-			logger.Infof("buzzer.SuccessBeep failed: %v", err)
-		}
-	}()
+	go a.successFeedback()
 	return true
 }

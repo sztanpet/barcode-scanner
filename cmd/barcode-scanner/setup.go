@@ -9,6 +9,7 @@ import (
 
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/buzzer"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/display"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/gpio"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/logwriter"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/storage"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/telegram"
@@ -133,6 +134,14 @@ func (a *app) setupScreen() {
 	a.screen.WriteHelp("scanner ready")
 }
 
+func (a *app) setupHardware() {
+	if a.cfg.HardwareVersion < 2 {
+		a.setupBuzzer()
+	} else {
+		a.setupGPIO()
+	}
+}
+
 func (a *app) setupBuzzer() {
 	if a.ctx.Err() != nil {
 		return
@@ -141,8 +150,16 @@ func (a *app) setupBuzzer() {
 	if err := buzzer.Setup(); err != nil {
 		logger.Warningf("buzzer setup error: %v", err)
 	}
-	if err := buzzer.StartupBeep(); err != nil {
-		logger.Warningf("buzzer beep error: %v", err)
+}
+
+func (a *app) setupGPIO() {
+	if a.ctx.Err() != nil {
+		return
+	}
+
+	if err := gpio.Setup(); err != nil {
+		logger.Criticalf("GPIO setup failed: %v", err)
+		return
 	}
 }
 

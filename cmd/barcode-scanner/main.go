@@ -107,10 +107,12 @@ func main() {
 	go a.inputLoop()
 	go a.idleLoop()
 
-	a.setupBuzzer()
+	a.setupHardware()
+	a.onBootup()
 
 	// canceling the context is the normal way to exit
 	<-ctx.Done()
+	a.onShutdown()
 	time.Sleep(250 * time.Millisecond)
 	os.Exit(0)
 }
