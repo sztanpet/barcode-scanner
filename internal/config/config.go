@@ -18,6 +18,7 @@ type Config struct {
 	TelegramToken     string
 	TelegramChannelID int64
 	MachineID         string
+	HardwareVersion   int64
 }
 
 func Get() *Config {
@@ -57,6 +58,17 @@ func Get() *Config {
 		os.Exit(1)
 	}
 
+	hwv := os.Getenv("HARDWARE_VERSION")
+	if hwv == "" {
+		hwv = "1"
+	}
+
+	HardwareVersion, err := strconv.ParseInt(hwv, 10, 64)
+	if err != nil {
+		logger.Criticalf("Failed parsing HARDWARE_VERSION env var!")
+		os.Exit(1)
+	}
+
 	return &Config{
 		StatePath:         StatePath,
 		UpdateBaseURL:     UpdateBaseURL,
@@ -64,6 +76,7 @@ func Get() *Config {
 		TelegramToken:     TelegramToken,
 		TelegramChannelID: TelegramChannelID,
 		MachineID:         machineID(),
+		HardwareVersion:   HardwareVersion,
 	}
 }
 
