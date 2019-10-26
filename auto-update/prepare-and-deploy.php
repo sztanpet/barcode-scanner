@@ -16,8 +16,8 @@ $binaries = [
 ];
 
 
-if ( $argc > 1 ) {
-  logMsg("More than 1 argument passed, assuming build-only mode!");
+if ( $argc != 2 and $argv[1] !== "deploy" ) {
+  logMsg("no 'deploy' argument passed, assuming build-only mode!");
 }
 
 foreach( $binaries as $bin ) {
