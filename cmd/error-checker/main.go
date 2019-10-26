@@ -59,6 +59,7 @@ func main() {
 		bin:  *binary,
 	}
 	a.handleSignals()
+	a.handleLED(binaries)
 	a.handleLogs(binaries)
 	a.handleServiceError()
 	a.handleDmesg()

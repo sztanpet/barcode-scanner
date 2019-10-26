@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/file"
+	"code.sztanpet.net/zvpsz/barcode-scanner/internal/gpio"
 	"code.sztanpet.net/zvpsz/barcode-scanner/internal/update"
 )
 
@@ -20,6 +21,30 @@ func (a *app) handleSignals() {
 		logger.Warningf("Caught signal: %v, exiting", s)
 		a.exit()
 	}(c)
+}
+
+func (a *app) handleLED(binaries []string) {
+	// if its the barcode-scanner binary that exited,
+	// make sure to switch the red LED on
+	for _, bin := range binaries {
+		if bin != "barcode-scanner" {
+			continue
+		}
+
+		if err := gpio.Setup(); err != nil {
+			logger.Criticalf("gpio.Setup failed: %v", err)
+			return
+		}
+
+		gpio.GreenLED.Disable()
+		gpio.BlueLED.Disable()
+		if err := gpio.RedLED.Enable(); err != nil {
+			logger.Criticalf("gpio.RedLED.Enable failed: %v", err)
+			return
+		}
+
+		break
+	}
 }
 
 func (a *app) handleLogs(binaries []string) {
