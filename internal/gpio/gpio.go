@@ -144,10 +144,19 @@ func Setup() (err error) {
 	if err := Beeper.export(); err != nil {
 		return err
 	}
+	if err := Beeper.direction(out); err != nil {
+		return err
+	}
 	if err := GreenLED.export(); err != nil {
 		return err
 	}
+	if err := GreenLED.direction(out); err != nil {
+		return err
+	}
 	if err := BlueLED.export(); err != nil {
+		return err
+	}
+	if err := BlueLED.direction(out); err != nil {
 		return err
 	}
 	if err := RedLED.export(); err != nil {
