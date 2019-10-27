@@ -11,6 +11,9 @@ func (a *app) onBootup() {
 			logger.Warningf("buzzer beep error: %v", err)
 		}
 	} else {
+		if err := gpio.Beeper.StartupBeep(); err != nil {
+			logger.Warningf("gpio.Beeper.StartupBeep error: %v", err)
+		}
 		gpio.RedLED.Disable()
 		if err := gpio.GreenLED.Enable(); err != nil {
 			logger.Criticalf("failed to switch green led on: %v", err)
