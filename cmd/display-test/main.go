@@ -19,10 +19,10 @@ func main() {
 
 	defer s.Blank()
 
-	_ = s.WriteTitle("WIFI SETUP")
-	_ = s.WriteLine(1, "SSID:")
-	_ = s.WriteLine(2, "fooBarŰÁÉÚŐÍÓÜÖ")
-	_ = s.WriteHelp("(enter when done)")
+	s.WriteTitle("WIFI SETUP")
+	s.WriteLine(1, "SSID:")
+	s.WriteLine(2, "fooBarŰÁÉÚŐÍÓÜÖ")
+	s.WriteHelp("(enter when done)")
 
 	time.Sleep(5 * time.Second)
 }
