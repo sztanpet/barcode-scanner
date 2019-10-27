@@ -24,6 +24,11 @@ func (a *app) handleSignals() {
 }
 
 func (a *app) handleLED(binaries []string) {
+	// only applicable for hardware with status leds
+	if a.cfg.HardwareVersion < 2 {
+		return
+	}
+
 	// if its the barcode-scanner binary that exited,
 	// make sure to switch the red LED on
 	for _, bin := range binaries {
