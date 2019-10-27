@@ -34,8 +34,8 @@ func (a *app) successFeedback() {
 			logger.Warningf("buzzer beep error: %v", err)
 		}
 	} else {
-		if err := gpio.Fail(a.ctx); err != nil {
-			logger.Infof("gpio.Fail failed: %v", err)
+		if err := gpio.Success(a.ctx); err != nil {
+			logger.Infof("gpio.Success failed: %v", err)
 		}
 	}
 }

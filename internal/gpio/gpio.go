@@ -209,11 +209,15 @@ func failFlash() (err error) {
 		err = GreenLED.Enable()
 	}()
 
-	if err := RedLED.Enable(); err != nil {
-		return err
+	// flash it 3 times
+	for i := 3; i > 0; i-- {
+		if err := RedLED.Enable(); err != nil {
+			return err
+		}
+		time.Sleep(flashDurr / 3)
+		RedLED.Disable()
+		time.Sleep(flashDurr / 3)
 	}
-	time.Sleep(flashDurr)
-	RedLED.Disable()
 	return
 }
 
