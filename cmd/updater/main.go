@@ -12,7 +12,7 @@ import (
 )
 
 var logger = loggo.GetLogger("updater")
-var updateDurr = 5 * time.Minute
+var updateDurr = 15 * time.Minute
 var binaries = []string{
 	"error-checker",
 	"updater",
