@@ -3,6 +3,7 @@ generating website: https://barcode.tec-it.com/en
 special formats:
 - 'EGRESS-' + digits, example: `EGRESS-0`
 - 'INGRESS-' + digits, example: `INGRESS-0`
-- 'WIFISETUP:' + ssid + '|' [ + password],
-  example: `WIFISETUP:HomeWifi|supersecretpw`, or
-           `WIFISETUP:ThisIsAnOpenWiFiNoPassword|`
+- 'WS$' + WiFi SSID,
+- 'WP$' + WiFi password,
+  example: `WS$HomeWifi`
+           `WP$supersecretpw`

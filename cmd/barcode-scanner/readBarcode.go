@@ -109,9 +109,19 @@ func (a *app) handleSpecialBarcode(bc string) bool {
 
 	if matches[3] != "" {
 		// barcode for wifi setup
-		WiFiAcc.SSID = matches[3]
-		WiFiAcc.PW = matches[4]
-		a.enterWifiSetupDone()
+		switch matches[3] {
+		case "WS":
+			WiFiAcc.SSID = matches[4]
+		case "WP":
+			WiFiAcc.PW = matches[4]
+		default:
+			logger.Tracef("wifi barcode matching failed, regex matches were: %#v", matches)
+			return false
+		}
+
+		if WiFiAcc.SSID != "" && WiFiAcc.PW != "" {
+			a.enterWifiSetupDone()
+		}
 	} else {
 		// direction and currier handling
 		switch strings.ToUpper(matches[1]) {
