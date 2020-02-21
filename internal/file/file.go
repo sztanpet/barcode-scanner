@@ -13,7 +13,13 @@ import (
 var TmpDir = filepath.Join(os.TempDir(), "barcode-scanner")
 
 func Serialize(path string, data interface{}) error {
-	tf, err := ioutil.TempFile(filepath.Dir(path), filepath.Base(path))
+	dir := filepath.Dir(path)
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		return err
+	}
+
+	tf, err := ioutil.TempFile(dir, filepath.Base(path))
 	if err != nil {
 		return err
 	}
