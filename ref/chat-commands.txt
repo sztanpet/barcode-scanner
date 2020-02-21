@@ -1,0 +1,3 @@
+# TODO add ability to specify exactly which system the command should address, use the config.MachineID
+!restart barcode-scanner
+!log barcode-scanner <log spec according to https://github.com/juju/loggo#func-parseconfigstring>
