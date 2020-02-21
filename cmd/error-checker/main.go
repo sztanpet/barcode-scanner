@@ -26,7 +26,7 @@ var binary = flag.String("binary", "", "the base name of the binary to check")
 var logs = flag.String("logs", "", "the base name of the binaries for which logs should be checked, separated by commas\nif empty, defaults to the logs for the binary")
 
 func init() {
-	loggo.GetLogger("").SetLogLevel(loggo.TRACE)
+	loggo.GetLogger("").SetLogLevel(loggo.WARNING)
 }
 
 func main() {
